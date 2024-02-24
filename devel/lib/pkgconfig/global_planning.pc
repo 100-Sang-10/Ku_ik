@@ -1,0 +1,8 @@
+prefix=/home/baek/git/Ku_ik/devel
+
+Name: global_planning
+Description: Description of global_planning
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

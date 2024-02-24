@@ -1,0 +1,8 @@
+prefix=/home/baek/git/Ku_ik/devel
+
+Name: lateral_control
+Description: Description of lateral_control
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

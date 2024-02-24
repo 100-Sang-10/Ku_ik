@@ -1,0 +1,2 @@
+carla_msgs:control/lateral_control:control/longitudinal_control:perception/lane_detection:perception/traffic_light:planning/global_planning:planning/local_planning
+-DCATKIN_DEVEL_PREFIX=/home/baek/git/Ku_ik/devel -DCMAKE_INSTALL_PREFIX=/home/baek/git/Ku_ik/install -G Unix Makefiles

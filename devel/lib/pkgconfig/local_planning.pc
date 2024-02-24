@@ -1,8 +1,0 @@
-prefix=/home/baek/git/Ku_ik/devel
-
-Name: local_planning
-Description: Description of local_planning
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

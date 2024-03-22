@@ -1,0 +1,7 @@
+<!-- -->
+<launch>
+    <arg name="mode" default="real"/>
+    <node pkg="longitudinal_control" type="longitudinal_control" name="longitudinal_control" output="screen">
+        <param name="mode" value="$(arg mode)"/>
+    </node>
+</launch>

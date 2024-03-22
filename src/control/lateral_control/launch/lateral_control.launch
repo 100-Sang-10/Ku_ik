@@ -1,0 +1,7 @@
+<!-- -->
+<launch>
+    <arg name="mode" default="real"/>
+    <node pkg="lateral_control" type="lateral_control" name="lateral_control" output="screen" respawn="true">
+        <param name="mode" value="$(arg mode)"/>
+    </node>
+</launch>

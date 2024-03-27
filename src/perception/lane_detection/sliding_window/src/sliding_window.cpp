@@ -23,6 +23,7 @@ int w = 800;
 int h = 500;
 int prev_left_index = 0;
 int prev_right_index = 0;
+Mat inverse_matrix;
 Point2f src_pts[4], dst_pts[4];
 std::vector<Point> mpoints(nwindows);
 std::vector<Point> lpoints(nwindows);
@@ -53,6 +54,8 @@ Mat Perspective(Mat& src) {
 	dst_pts[3] = Point2f(0, h-1);
 
 	Mat pers = getPerspectiveTransform(src_pts, dst_pts);
+	Mat inv_pers = getPerspectiveTransform(dst_pts, src_pts);
+	inverse_matrix = inv_pers;
 	Mat dst;
 
 	warpPerspective(src, dst, pers, Size(w, h));
@@ -90,12 +93,12 @@ Mat GRAY2RGB(Mat& image){
     return color_img;
 }
 
-Mat GaussianFilter(Mat& image, int kernel_size = 3, double sigma = 1.0) {
+Mat GaussianFilter(Mat& image, int kernel_size = 10, double sigma = 1.5) {
     
 	Mat kernel = getGaussianKernel(kernel_size, sigma);
     Mat filtered_img;
     filter2D(image, filtered_img, -1, kernel);
-	// Sobel(filtered_img, filtered_img, -1, 1, 0);
+	Sobel(filtered_img, filtered_img, -1, 1, 0);
     return filtered_img;
 
 }
@@ -115,11 +118,13 @@ Mat Contrast(Mat& image){
 Mat Binarize(Mat& image){
    
 	Mat output_img;
-    
-	adaptiveThreshold(image, output_img, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 99, -20);
+    int kernel_size = 5;
+    Mat kernel = getStructuringElement(MORPH_RECT, Size(kernel_size, kernel_size));
+  
+	adaptiveThreshold(image, output_img, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 121, -20);
     morphologyEx(output_img, output_img, MORPH_ELLIPSE, Mat(),Point(-1,-1), 3);
+	dilate(output_img, output_img, kernel);
 	morphologyEx(output_img, output_img, MORPH_CLOSE, Mat(),Point(-1,-1), 5);
-	// morphologyEx(output_img, output_img, MORPH_CLOSE, Mat());
    	return output_img;
 }
 
@@ -147,8 +152,8 @@ Mat RegionOfInterest(Mat& source)
     float trapezoidHeight = 1.0; // Height of the trapezoid expressed as percentage of image height
 	
 	float smallBottomWidth = 0.5; // This will be added to trapezoidBottomWidth to create a less wide bottom edge
-    float smallTopWidth = 0.4; // We multiply the percentage trapoezoidTopWidth with this parameter to create a less wide top edge
-    float smallHeight = 0.6; // Height of the small trapezoid expressed as percentage of height of big trapezoid
+    float smallTopWidth = 0.3; // We multiply the percentage trapoezoidTopWidth with this parameter to create a less wide top edge
+    float smallHeight = 0.9; // Height of the small trapezoid expressed as percentage of height of big trapezoid
 
 	float bar = 1;
 
@@ -196,7 +201,7 @@ Mat GetHistImage(const Mat& img){
     int max_left = 0, max_right = 0;
     int max_left_index = 0, max_right_index = 0;
 
-	cout << "-----------" << endl;
+	// cout << "-----------" << endl;
     for (int i = 0; i < center; i++) {
         if (histogram[i] > max_left) {
             max_left = histogram[i];
@@ -207,7 +212,7 @@ Mat GetHistImage(const Mat& img){
     }
 	if(max_left == 0){
 		max_left_index = prev_left_index;
-		cout << "왼쪽 차선 없음" << endl;
+		// cout << "왼쪽 차선 없음" << endl;
 	}
 
     for (int i = center; i < image_width; i++) {
@@ -220,7 +225,7 @@ Mat GetHistImage(const Mat& img){
     }
 	if(max_right == 0){
 			max_right_index = prev_right_index;
-			cout << "오른쪽 차선 없음" << endl;
+			// cout << "오른쪽 차선 없음" << endl;
 	}
 	left_start_index = max_left_index;
 	right_start_index = max_right_index;
@@ -255,7 +260,8 @@ Mat SlidingWindow(Mat& binarized_image){
     // int center_x = binarized_image.cols / 2;
     // // y축으로 이동할 스텝 사이즈를 정의합니다.
     // int step_y = 80;
-
+	Mat color_img;
+	cvtColor(binarized_image, color_img, COLOR_GRAY2BGR);
     // 윈도우의 너비와 높이를 정의합니다.
     int window_height = (int)(h / nwindows);
     int window_width = (int)(w / nwindows * 1.2);
@@ -352,12 +358,12 @@ Mat SlidingWindow(Mat& binarized_image){
 		if (lnonzero < pixel_thres && rnonzero > pixel_thres) {
 			lane_mid = right_start - right_diff;
 			left_start = lane_mid - right_diff;
-            cout << "우측 차선의 대칭 이동" << endl;
+            // cout << "우측 차선의 대칭 이동" << endl;
 		}
 		else if (lnonzero > pixel_thres && rnonzero < pixel_thres) {
 			lane_mid = left_start + left_diff;
 			right_start = lane_mid + left_diff;
-            cout << "좌측 차선의 대칭 이동" << endl;
+            // cout << "좌측 차선의 대칭 이동" << endl;
 		}
 // 2번째 if문
 			// 지난 프레임에서의 픽셀값을 기억하고 nonzero가 임계값을 넘지 못할 경우 지난 프레임의 해당 윈도우 번호의 값을 불러옴
@@ -371,8 +377,8 @@ Mat SlidingWindow(Mat& binarized_image){
 		}
 		// cvtColor(binarized_image, binarized_image, COLOR_GRAY2BGR);
 		// draw window at v_thres
-		rectangle(binarized_image, Rect(win_x_leftb_left, win_y_high, window_width, window_height), Scalar(255, 255, 255), 2);
-		rectangle(binarized_image, Rect(win_x_rightb_left, win_y_high, window_width, window_height), Scalar(255, 255, 255), 2);
+		rectangle(color_img, Rect(win_x_leftb_left, win_y_high, window_width, window_height), Scalar(0, 0, 255), 2);
+		rectangle(color_img, Rect(win_x_rightb_left, win_y_high, window_width, window_height), Scalar(0, 255, 0), 2);
 		//rectangle(s_img, Rect(win_x_leftb_left+50, win_y_high+200, window_width, window_height), Scalar(0, 255, 0), 1);
 		//rectangle(s_img, Rect(win_x_rightb_left+50, win_y_high+200, window_width, window_height), Scalar(0, 0, 255), 1);
 
@@ -380,124 +386,25 @@ Mat SlidingWindow(Mat& binarized_image){
 		mpoints[window] = Point(lane_mid, (int)((win_y_high + win_y_low) / 2));
 		lpoints[window] = Point(left_start, (int)((win_y_high + win_y_low) / 2));
 		rpoints[window] = Point(right_start, (int)((win_y_high + win_y_low) / 2));
-		Vec4f left_line, right_line, mid_line;
 
-		fitLine(lpoints, left_line, DIST_L2, 0, 0.01, 0.01); // 출력의 0,1 번째 인자는 단위벡터, 3,4번째 인자는 선 위의 한 점
-		fitLine(rpoints, right_line, DIST_L2, 0, 0.01, 0.01);
-		fitLine(mpoints, mid_line, DIST_L2, 0, 0.01, 0.01);
-
-			// 방향이 항상 아래를 향하도록 만들기 위해 단위 벡터의 방향을 바꿔준다.
-		if (left_line[1] > 0) {
-			left_line[1] = -left_line[1];
-		}
-		if (right_line[1] > 0) {
-			right_line[1] = -right_line[1];
-		}
-		if (mid_line[1] > 0) {
-			mid_line[1] = -mid_line[1];
-		}
-
-		int lx0 = left_line[2], ly0 = left_line[3]; // 선 위의 한 점
-		int lx1 = lx0 + h / 2 * left_line[0], ly1 = ly0 + h / 2 * left_line[1]; // 단위 벡터 -> 그리고자 하는 길이를 빼주거나 더해줌
-		int lx2 = 2 * lx0 - lx1, ly2 = 2 * ly0 - ly1;
-
-		int rx0 = right_line[2], ry0 = right_line[3];
-		int rx1 = rx0 + h / 2 * right_line[0], ry1 = ry0 + h / 2 * right_line[1];
-		int rx2 = 2 * rx0 - rx1, ry2 = 2 * ry0 - ry1;
-
-		int mx0 = mid_line[2], my0 = mid_line[3];
-		int mx1 = mx0 + h / 2 * mid_line[0], my1 = my0 + h / 2 * mid_line[1];
-		int mx2 = 2 * mx0 - mx1, my2 = 2 * my0 - my1;
-
-		line(binarized_image, Point(lx1, ly1), Point(lx2, ly2), Scalar(0, 100, 200), 3);
-		line(binarized_image, Point(rx1, ry1), Point(rx2, ry2), Scalar(0, 100, 200), 3);
-		line(binarized_image, Point(mx1, my1), Point(mx2, my2), Scalar(0, 0, 255), 3);
-
-    // // 찾은 흰색 픽셀의 위치를 저장할 벡터를 생성합니다.
-    // vector<Point> left_white_pixel_centers;
-    // vector<Point> right_white_pixel_centers;
-
-  
-
-    // // 아래에서 위로 이동하며 흰색 픽셀을 찾습니다.
-    // for (int y = binarized_image.rows; y >= 0; y -= step_y) {
-    //     // 왼쪽 윈도우를 생성합니다.
-    //     Rect left_window_rect(left_start - window_width / 2, y - window_height, window_width, window_height);
- 
-	// 	// 현재 위치에서 왼쪽 윈도우 내의 흰색 픽셀을 찾습니다.
-	// 	if(left_window_rect.x < 0){
-	// 		left_window_rect.x = 0;
-	// 	}
-	// 	if(left_window_rect.y < 0){
-	// 		break;
-	// 	}
-        
-    //     Mat left_window = binarized_image(left_window_rect);
-    //     vector<Point> left_white_pixel_positions;
-    //     findNonZero(left_window, left_white_pixel_positions);
-
-    //     // 왼쪽에서 흰색 픽셀을 찾은 경우
-    //     if (!left_white_pixel_positions.empty()) {
-    //         // 픽셀 값을 찾아 업데이트합니다.
-    //         left_start = left_white_pixel_positions[0].x;
-    //         // 픽셀의 중심 위치를 저장합니다.
-    //         left_white_pixel_centers.push_back(Point(left_start, y));
-    //         rectangle(binarized_image, left_window_rect, Scalar(255), 2);
-    //     } 
-	// 	else {
-    //         // 픽셀의 중심 위치를 저장합니다.
-    //         left_white_pixel_centers.push_back(Point(left_start, y));
-	// 		// 흰색 픽셀을 찾지 못한 경우 이전 단계와 동일한 x 좌표를 가지는 윈도우를 그립니다.
-    //         Rect left_window_rect_prev(left_start - window_width / 2, y - window_height / 2, window_width, window_height);
-    //         rectangle(binarized_image, left_window_rect_prev, Scalar(255), 2);
-    //     }
-
-
-	// 	// 오른쪽 윈도우를 생성합니다.
-    //     Rect right_window_rect(right_start - window_width / 2, y - window_height, window_width, window_height);
-
-    //     // 현재 위치에서 오른쪽 윈도우 내의 흰색 픽셀을 찾습니다.
-	// 	if(right_window_rect.x > binarized_image.cols - window_width){ // 윈도우의 좌측 상단의 점이 
-	// 		right_window_rect.x = binarized_image.cols - window_width;
-	// 	}
-	// 	if(right_window_rect.y < 0){
-	// 		break;
-	// 	}
-    //     Mat right_window = binarized_image(right_window_rect);
-    //     vector<Point> right_white_pixel_positions;
-    //     findNonZero(right_window, right_white_pixel_positions);
-
-    //     // 오른쪽에서 흰색 픽셀을 찾은 경우
-    //     if (!right_white_pixel_positions.empty()) {
-    //         // 픽셀 값을 찾아 업데이트합니다.
-    //         right_start = right_window_rect.x + right_white_pixel_positions[0].x;
-    //         // 픽셀의 중심 위치를 저장합니다.
-    //         right_white_pixel_centers.push_back(Point(right_start, y));
-    //         rectangle(binarized_image, right_window_rect, Scalar(255), 2);
-    //     } 
-	// 	else {
-    //         // 흰색 픽셀을 찾지 못한 경우 이전 단계와 동일한 x 좌표를 가지는 윈도우를 그립니다.
-    //         Rect right_window_rect_prev(right_start - window_width / 2, y - window_height / 2, window_width, window_height);
-    //         rectangle(binarized_image, right_window_rect_prev, Scalar(255), 2);
-    //     }
-    
-    // }
-
-    // // 찾은 흰색 픽셀의 중심 위치를 출력합니다.
-    // cout << "왼쪽에서 찾은 흰색 픽셀의 중심 위치:" << endl;
-    // for (const auto& pos : left_white_pixel_centers) {
-    //     cout << "(" << pos.x << ", " << pos.y << ")" << endl;
-    // }
-
-	// // 찾은 흰색 픽셀의 중심 위치를 출력합니다.
-    // cout << "오른쪽에서 찾은 흰색 픽셀의 중심 위치:" << endl;
-    // for (const auto& pos : right_white_pixel_centers) {
-    //     cout << "(" << pos.x << ", " << pos.y << ")" << endl;
     }
 
-	return binarized_image;
-}
 
+	polylines(color_img, lpoints, false, Scalar(0, 100, 200), 15, LINE_AA);
+	polylines(color_img, rpoints, false, Scalar(200, 100, 0), 15, LINE_AA);
+
+
+
+	return color_img;
+}
+Mat InversePerspective(Mat& input_img, Mat& output_img){
+	Mat unwarp_img;
+	Mat result_img;
+	warpPerspective(input_img, unwarp_img, inverse_matrix, Size(output_img.cols, output_img.rows), INTER_LINEAR);
+	addWeighted(output_img, 1.0, unwarp_img, 0.5, 0, result_img);
+	return result_img;
+	
+}
 void ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 
 	try
@@ -513,11 +420,9 @@ void ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 		Mat roi_img = RegionOfInterest(binary_img);
 		Mat hist_img = GetHistImage(roi_img);
 		Mat search_img = SlidingWindow(roi_img);
+		Mat unwarp_img = InversePerspective(search_img, base_img);
 
-		imshow("Base Image", base_img);
-		imshow("Histogram Image", hist_img);
-		imshow("Sliding Window", search_img);
-        imshow("Perspective", perspect_img); 	
+		imshow("RESULT Image", unwarp_img);
  	
 		waitKey(30); 
 	}

@@ -1,12 +1,16 @@
-#include <cv_bridge/cv_bridge.h>
 #include <iostream>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
-#include <sensor_msgs/Image.h>
+
+#include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+
 #include <vector>
+#include <sensor_msgs/Image.h>
+#include <geometry_msgs/Point.h>
+#include <geometry_msgs/PoseArray.h>
 
 using namespace cv;
 using namespace std;
@@ -14,40 +18,59 @@ using namespace std;
 // Mat base_img;
 // Mat binary_img;
 // Mat perspect_img;
+class LaneDetection{
+	private:
+		int mid_point;
+		int left_start_index;
+		int right_start_index;
+		int nwindows = 12;
+		int w = 800;
+		int h = 500;
+		int prev_left_index = 0;
+		int prev_right_index = 0;
+		cv::Mat inverse_matrix;
+		Point2f src_pts[4], dst_pts[4];
 
-int mid_point;
-int left_start_index;
-int right_start_index;
-int nwindows = 12;
-int w = 800;
-int h = 500;
-int prev_left_index = 0;
-int prev_right_index = 0;
-Mat inverse_matrix;
-Point2f src_pts[4], dst_pts[4];
-std::vector<Point> mpoints(nwindows);
-std::vector<Point> lpoints(nwindows);
-std::vector<Point> rpoints(nwindows);
-std::vector<Point> mmpoints(nwindows);
+		std::vector<Point> mpoints;
+		std::vector<Point> lpoints;
+		std::vector<Point> rpoints;
 
-Mat Perspective(Mat& src) {
+		ros::NodeHandle nh;
+		image_transport::ImageTransport it;
+		ros::Subscriber sub;
+		ros::Publisher pub_midpoint;
+
+	public :
+		LaneDetection() : it(nh), mpoints(nwindows), lpoints(nwindows), rpoints(nwindows)
+		{
+			sub = nh.subscribe("/carla/ego_vehicle/rgb_front/image", 1, &LaneDetection::ImageCallback, this);
+			pub_midpoint = nh.advertise<geometry_msgs::PoseArray>("/mid_point",100);
+		}
+		~LaneDetection(){};
+		cv::Mat Perspective(cv::Mat& src);
+	    cv::Mat RGB2Gray(Mat& image);
+		cv::Mat GRAY2RGB(Mat& image);
+		cv::Mat GaussianFilter(Mat& image, int kernel_size = 10, double sigma = 1.5);
+		cv::Mat Contrast(Mat& image);
+		cv::Mat Binarize(Mat& image);
+		cv::Mat RegionOfInterest(Mat& source);
+		cv::Mat GetHistImage(const Mat& img);
+		cv::Mat SlidingWindow(Mat& binarized_image);
+		cv::Mat InversePerspective(Mat& input_img, Mat& output_img);
+		void ImageCallback(const sensor_msgs::ImageConstPtr& msg);
+
+};
+
+
+Mat LaneDetection::Perspective(Mat& src) {	
 	
 
 
-	src_pts[0] = Point2f(160, 467);
-	src_pts[1] = Point2f(640, 467);
-	src_pts[2] = Point2f(770, 590);
-	src_pts[3] = Point2f(30, 590);
+	src_pts[0] = Point2f(160, 460);
+	src_pts[1] = Point2f(640, 460);
+	src_pts[2] = Point2f(770, 560);
+	src_pts[3] = Point2f(30, 560);
 
-	// src_pts[0] = Point2f(282, 467);
-	// src_pts[1] = Point2f(512, 467);
-	// src_pts[2] = Point2f(720, 590);
-	// src_pts[3] = Point2f(94, 590);
-
-	// dst_pts[0] = Point2f(332, 337);
-	// dst_pts[1] = Point2f(462, 337);
-	// dst_pts[2] = Point2f(700, 590);
-	// dst_pts[3] = Point2f(114, 590);
 	dst_pts[0] = Point2f(0, 0);
 	dst_pts[1] = Point2f(w-1, 0);
 	dst_pts[2] = Point2f(w-1, h-1);
@@ -62,38 +85,24 @@ Mat Perspective(Mat& src) {
 
 	return dst;
 
-}
+};
 
 
 
-Mat Houghtransform(Mat& image){
-
-	Mat lineResult;
-	cvtColor(image, lineResult, COLOR_GRAY2BGR);
-    vector<Vec4i> lines;
-	HoughLinesP(image, lines, 1, CV_PI/180, 100, 50, 250);
-	for(size_t i = 0; i < lines.size(); i++){
-		Vec4i l = lines[i];
-		line(lineResult, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 2, LINE_AA);
-	}
-
-	return lineResult;
-}
-
-Mat RGB2Gray(Mat& image){
+Mat LaneDetection::RGB2Gray(Mat& image){
     Mat gray_img;
     cvtColor(image, gray_img, COLOR_BGR2GRAY);
     return gray_img;
-}
+};
 
 
-Mat GRAY2RGB(Mat& image){
+Mat LaneDetection::GRAY2RGB(Mat& image){
     Mat color_img;
     cvtColor(image, color_img, COLOR_GRAY2BGR);
     return color_img;
 }
 
-Mat GaussianFilter(Mat& image, int kernel_size = 10, double sigma = 1.5) {
+Mat LaneDetection::GaussianFilter(Mat& image, int kernel_size, double sigma) {
     
 	Mat kernel = getGaussianKernel(kernel_size, sigma);
     Mat filtered_img;
@@ -101,9 +110,9 @@ Mat GaussianFilter(Mat& image, int kernel_size = 10, double sigma = 1.5) {
 	Sobel(filtered_img, filtered_img, -1, 1, 0);
     return filtered_img;
 
-}
+};
 
-Mat Contrast(Mat& image){
+Mat LaneDetection::Contrast(Mat& image){
 
 	Mat output_img;
 	float alpha = 1.f;
@@ -112,10 +121,10 @@ Mat Contrast(Mat& image){
 
 	return output_img;	 
 
-}
+};
 
 
-Mat Binarize(Mat& image){
+Mat LaneDetection::Binarize(Mat& image){
    
 	Mat output_img;
     int kernel_size = 5;
@@ -126,20 +135,9 @@ Mat Binarize(Mat& image){
 	dilate(output_img, output_img, kernel);
 	morphologyEx(output_img, output_img, MORPH_CLOSE, Mat(),Point(-1,-1), 5);
    	return output_img;
-}
+};
 
-
-Mat CannyEdge(Mat& source)
-{
-    Mat dst;
-    Canny(source, dst, 80, 120);
-	morphologyEx(dst, dst, MORPH_CLOSE, Mat(), Point(-1, -1), 1);
-
-
-    return dst;
-}
-Mat RegionOfInterest(Mat& source)
-{
+Mat LaneDetection::RegionOfInterest(Mat& source){
 	// float trapezoidBottomWidth = 1.0; // Width of bottom edge of trapezoid, expressed as percentage of image width
     // float trapezoidTopWidth = 0.08; // Above comment also applies here, but then for the top edge of trapezoid
     // float trapezoidHeight = 0.45; // Height of the trapezoid expressed as percentage of image height
@@ -178,9 +176,9 @@ Mat RegionOfInterest(Mat& source)
     bitwise_and(source, mask, maskedImage);
 
     return maskedImage;
-}
+};
 
-Mat GetHistImage(const Mat& img){
+Mat LaneDetection::GetHistImage(const Mat& img){
 
 	// Calculate histogram by summing pixel values for each column
     int image_width = img.cols;
@@ -252,9 +250,9 @@ Mat GetHistImage(const Mat& img){
         line(hist_image, Point(x1, y1), Point(x2, y2), Scalar(255, 255, 255), 2, LINE_AA);
     }
 	return hist_image;
-}
+};
 
-Mat SlidingWindow(Mat& binarized_image){
+Mat LaneDetection::SlidingWindow(Mat& binarized_image){
     
     // // 이미지의 중앙을 계산합니다.
     // int center_x = binarized_image.cols / 2;
@@ -375,37 +373,47 @@ Mat SlidingWindow(Mat& binarized_image){
 			right_start = rpoints[window].x;
 			lane_mid = (right_start + left_start) / 2;
 		}
-		// cvtColor(binarized_image, binarized_image, COLOR_GRAY2BGR);
+
 		// draw window at v_thres
 		rectangle(color_img, Rect(win_x_leftb_left, win_y_high, window_width, window_height), Scalar(0, 0, 255), 2);
 		rectangle(color_img, Rect(win_x_rightb_left, win_y_high, window_width, window_height), Scalar(0, 255, 0), 2);
-		//rectangle(s_img, Rect(win_x_leftb_left+50, win_y_high+200, window_width, window_height), Scalar(0, 255, 0), 1);
-		//rectangle(s_img, Rect(win_x_rightb_left+50, win_y_high+200, window_width, window_height), Scalar(0, 0, 255), 1);
-
 
 		mpoints[window] = Point(lane_mid, (int)((win_y_high + win_y_low) / 2));
 		lpoints[window] = Point(left_start, (int)((win_y_high + win_y_low) / 2));
 		rpoints[window] = Point(right_start, (int)((win_y_high + win_y_low) / 2));
 
     }
+	polylines(color_img, lpoints, false, Scalar(0, 100, 200), 10, LINE_AA);
+	polylines(color_img, rpoints, false, Scalar(200, 100, 0), 10, LINE_AA);
+	polylines(color_img, mpoints, false, Scalar(0, 200, 0), 10, LINE_AA);
+	
+		// mid_points.data(mpoints);
+	geometry_msgs::PoseArray mid_points;
+	for(int i=0; i<mpoints.size(); i++)
+	{	
+		geometry_msgs::Pose temp;
+		temp.position.x = mpoints[i].x;
+		temp.position.y = mpoints[i].y;
+		mid_points.poses.push_back(temp);
+	}
+	geometry_msgs::Pose temp;
+	temp.position.x = 0.0;
+	temp.position.y = 0.0;
+	mid_points.poses.push_back(temp);
 
-
-	polylines(color_img, lpoints, false, Scalar(0, 100, 200), 15, LINE_AA);
-	polylines(color_img, rpoints, false, Scalar(200, 100, 0), 15, LINE_AA);
-
-
+	pub_midpoint.publish(mid_points);
 
 	return color_img;
-}
-Mat InversePerspective(Mat& input_img, Mat& output_img){
+};
+Mat LaneDetection::InversePerspective(Mat& input_img, Mat& output_img){
 	Mat unwarp_img;
 	Mat result_img;
 	warpPerspective(input_img, unwarp_img, inverse_matrix, Size(output_img.cols, output_img.rows), INTER_LINEAR);
 	addWeighted(output_img, 1.0, unwarp_img, 0.5, 0, result_img);
 	return result_img;
 	
-}
-void ImageCallback(const sensor_msgs::ImageConstPtr& msg){
+};
+void LaneDetection::ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 
 	try
 	{
@@ -416,13 +424,13 @@ void ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 		Mat contrast_img = Contrast(filtered_img);	
 		Mat perspect_img = Perspective(contrast_img);
 		Mat binary_img = Binarize(perspect_img);
-		// Mat hough_img = Houghtransform(binary_img);
 		Mat roi_img = RegionOfInterest(binary_img);
 		Mat hist_img = GetHistImage(roi_img);
 		Mat search_img = SlidingWindow(roi_img);
-		Mat unwarp_img = InversePerspective(search_img, base_img);
+		Mat result_img = InversePerspective(search_img, base_img);
 
-		imshow("RESULT Image", unwarp_img);
+		imshow("RESULT Image", result_img);
+		imshow("Sliding Window Image", search_img);
  	
 		waitKey(30); 
 	}
@@ -431,16 +439,12 @@ void ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 	ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
 	}
 
-}
+};
 
 int main (int argc, char** argv){
 
 	ros::init(argc, argv, "sliding_window_node");
-	ros::NodeHandle nh;
-
-
-    image_transport::ImageTransport it(nh);
-    image_transport::Subscriber sub = it.subscribe("/carla/ego_vehicle/rgb_front/image", 1, ImageCallback);
+	LaneDetection l;
 	while (ros::ok())
 	{
 		ros::spinOnce();

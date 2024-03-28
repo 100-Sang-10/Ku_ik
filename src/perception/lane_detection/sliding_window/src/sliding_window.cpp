@@ -8,16 +8,21 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <vector>
+#include <std_msgs/Int64.h>
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseArray.h>
 
+#define WAYPOINT_DRIVING  20
+#define LANE_POINT_DRIVING 21
+#define THRESHOLD_DISTANCE 30
 using namespace cv;
 using namespace std;
 
 // Mat base_img;
 // Mat binary_img;
 // Mat perspect_img;
+
 class LaneDetection{
 	private:
 		int mid_point;
@@ -28,6 +33,9 @@ class LaneDetection{
 		int h = 500;
 		int prev_left_index = 0;
 		int prev_right_index = 0;
+		int state = 0;
+		bool trigger = true;
+
 		cv::Mat inverse_matrix;
 		Point2f src_pts[4], dst_pts[4];
 
@@ -39,12 +47,15 @@ class LaneDetection{
 		image_transport::ImageTransport it;
 		ros::Subscriber sub;
 		ros::Publisher pub_midpoint;
+		ros::Publisher pub_state;
 
 	public :
 		LaneDetection() : it(nh), mpoints(nwindows), lpoints(nwindows), rpoints(nwindows)
 		{
 			sub = nh.subscribe("/carla/ego_vehicle/rgb_front/image", 1, &LaneDetection::ImageCallback, this);
 			pub_midpoint = nh.advertise<geometry_msgs::PoseArray>("/mid_point",100);
+			pub_state = nh.advertise<std_msgs::Int64>("/state",100);
+		
 		}
 		~LaneDetection(){};
 		cv::Mat Perspective(cv::Mat& src);
@@ -193,7 +204,6 @@ Mat LaneDetection::GetHistImage(const Mat& img){
         histogram[col] = sum;
     }
 	
-
     // Find the maximum values on the left and right sides of the histogram
     int center = image_width / 2;
     int max_left = 0, max_right = 0;
@@ -208,10 +218,6 @@ Mat LaneDetection::GetHistImage(const Mat& img){
 			prev_left_index = max_left_index;
 		}
     }
-	if(max_left == 0){
-		max_left_index = prev_left_index;
-		// cout << "왼쪽 차선 없음" << endl;
-	}
 
     for (int i = center; i < image_width; i++) {
         if (histogram[i] > max_right) {
@@ -221,9 +227,19 @@ Mat LaneDetection::GetHistImage(const Mat& img){
 			prev_right_index = max_right_index;
 		}
     }
-	if(max_right == 0){
-			max_right_index = prev_right_index;
-			// cout << "오른쪽 차선 없음" << endl;
+	cout << "---------" << endl;
+	trigger = true;
+
+	if(max_left == 0 && max_right == 0){
+		max_left_index = prev_left_index;
+		max_right_index = prev_right_index;
+		state = WAYPOINT_DRIVING;
+		cout << "차선 인지 불가" << endl;
+		trigger =false;
+	}
+	else{
+		state = LANE_POINT_DRIVING;
+		cout << "차선 인지 성공" << endl;
 	}
 	left_start_index = max_left_index;
 	right_start_index = max_right_index;
@@ -302,7 +318,7 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 
 		int offset = (int)((win_y_high + win_y_low) / 2);	
 
-		int pixel_thres = window_width * 0.05;
+		int pixel_thres = window_width * 0.03;
 
 		int ll = 0, lr = 0; int rl = 800, rr = 800;
 		int li = 0; // nonzero가 몇개인지 파악하기 위한 벡터에 사용될 인자
@@ -396,6 +412,40 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 		temp.position.y = mpoints[i].y;
 		mid_points.poses.push_back(temp);
 	}
+	int l_max = 0;
+	int l_min = 9999;
+	int r_max = 0;
+	int r_min = 9999;
+	int threshold_distance = THRESHOLD_DISTANCE ;
+
+	for(int i = 0 ; i < lpoints.size() ; i++){
+		if(lpoints[i].x > l_max){
+			l_max = lpoints[i].x;
+		}
+		if(rpoints[i].x > r_max){
+			r_max = rpoints[i].x;
+		}
+	}
+
+	for(int i = 0 ; i < lpoints.size() ; i++){
+		if(lpoints[i].x < l_min){
+			l_min = lpoints[i].x;
+		}
+		if(rpoints[i].x < r_min){
+			r_min = rpoints[i].x;
+		}
+	}
+	if(trigger){
+		if(abs(l_max - l_min) >threshold_distance || abs(r_max - r_min) > threshold_distance ){
+			state = WAYPOINT_DRIVING;
+			cout << "Too Long between max & min" << endl;
+		}
+		else {
+			state = LANE_POINT_DRIVING;
+			cout << "Lane follow !!" << endl;
+		}
+	}
+
 	geometry_msgs::Pose temp;
 	temp.position.x = 0.0;
 	temp.position.y = 0.0;

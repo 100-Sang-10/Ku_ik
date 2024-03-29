@@ -15,7 +15,7 @@
 
 #define WAYPOINT_DRIVING  20
 #define LANE_POINT_DRIVING 21
-#define THRESHOLD_DISTANCE 30
+#define THRESHOLD_DISTANCE 70
 using namespace cv;
 using namespace std;
 
@@ -30,11 +30,12 @@ class LaneDetection{
 		int right_start_index;
 		int nwindows = 12;
 		int w = 800;
-		int h = 500;
+		int h =  500;
 		int prev_left_index = 0;
 		int prev_right_index = 0;
 		int state = 0;
 		bool trigger = true;
+		int max_left_index = 0, max_right_index = 0;
 
 		cv::Mat inverse_matrix;
 		Point2f src_pts[4], dst_pts[4];
@@ -142,7 +143,7 @@ Mat LaneDetection::Binarize(Mat& image){
     Mat kernel = getStructuringElement(MORPH_RECT, Size(kernel_size, kernel_size));
   
 	adaptiveThreshold(image, output_img, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 121, -20);
-    morphologyEx(output_img, output_img, MORPH_ELLIPSE, Mat(),Point(-1,-1), 3);
+    morphologyEx(output_img, output_img, MORPH_ELLIPSE, Mat(),Point(-1,-1), 2);
 	dilate(output_img, output_img, kernel);
 	morphologyEx(output_img, output_img, MORPH_CLOSE, Mat(),Point(-1,-1), 5);
    	return output_img;
@@ -207,7 +208,7 @@ Mat LaneDetection::GetHistImage(const Mat& img){
     // Find the maximum values on the left and right sides of the histogram
     int center = image_width / 2;
     int max_left = 0, max_right = 0;
-    int max_left_index = 0, max_right_index = 0;
+    
 
 	// cout << "-----------" << endl;
     for (int i = 0; i < center; i++) {
@@ -282,11 +283,49 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
     int margin = window_width / 2;
 
     // init value setting
+	int w = binarized_image.cols;
+	int h = binarized_image.rows;
 
+	int l_start = left_start_index;
+	int r_start = right_start_index;
+	cout << "L start :" << l_start << endl;
+	cout << "R start :" << r_start << endl;
+	// select starting points
+	int left_l_init = l_start, left_r_init = l_start;				// ì™¼ìª½ì°¨ì„ ì˜ ì™¼ì˜¤ë¥¸ìª½ ë xì¢Œí‘œ
+	int right_l_init = r_start, right_r_init = r_start;			// ì˜¤ë¥¸ìª½ì°¨ì„ ì˜ ì™¼ì˜¤ë¥¸ìª½ ë xì¢Œí‘œ
+
+
+	for (int x = 0; x < w; x++) // 639 -> 0
+	{
+		if (x < w/2)
+		{
+			if (binarized_image.at<uchar>(h-1, x) == 255 && left_l_init == l_start) {
+				left_r_init = x;
+				left_l_init = x;
+			}
+			if (binarized_image.at<uchar>(h-1, x) == 255 && left_r_init != l_start) {
+				left_r_init = x;
+			}
+		}
+		else 
+		{
+			if (binarized_image.at<uchar>(h-1,x) == 255 && right_l_init == r_start)
+			{
+				right_r_init = x;
+				right_l_init = x;
+			}
+			if(binarized_image.at<uchar>(h-1, x) == 255 && right_r_init != r_start) {
+				right_r_init = x;
+			}
+		}
+	}
+
+	int right_start = (right_l_init + right_r_init) / 2;
+	int left_start = (left_l_init + left_r_init) / 2;
     // 왼쪽과 오른쪽에서 시작 위치를 찾습니다.
-    int left_start = left_start_index;
-    int right_start = right_start_index;
-
+    // int left_start = left_start_index;
+    // int right_start = right_start_index;
+	cout << left_start << endl;
 	int lane_mid = w / 2;
 
 	int win_y_high = h - window_height;
@@ -301,6 +340,8 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 	lpoints[0] = Point(left_start, (int)((win_y_high + win_y_low) / 2));
 	rpoints[0] = Point(right_start, (int)((win_y_high + win_y_low) / 2));
 	mpoints[0] = Point((int)((left_start + right_start) / 2), (int)((win_y_high + win_y_low) / 2));
+
+	cout << win_x_leftb_left << endl;
 
     rectangle(binarized_image, Rect(win_x_leftb_left, win_y_high, window_width, window_height), Scalar(255, 255, 255), 1);
 	rectangle(binarized_image, Rect(win_x_rightb_left, win_y_high, window_width, window_height), Scalar(255, 255, 255), 1);
@@ -384,10 +425,14 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 		if (lnonzero < pixel_thres && rnonzero > pixel_thres) {
 			left_start = lpoints[window].x;
 			lane_mid = (right_start + left_start) / 2;
+			// cout << "좌측 Window [ " << window <<  " ] 지난 프레임 정보 사용" << endl;
+
 		}
 		else if (lnonzero > pixel_thres && rnonzero < pixel_thres && rpoints[window].x != 0) {
 			right_start = rpoints[window].x;
 			lane_mid = (right_start + left_start) / 2;
+			// cout << "우측 Window [ " << window <<  " ] 지난 프레임 정보 사용" << endl;
+
 		}
 
 		// draw window at v_thres
@@ -403,7 +448,7 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 	polylines(color_img, rpoints, false, Scalar(200, 100, 0), 10, LINE_AA);
 	polylines(color_img, mpoints, false, Scalar(0, 200, 0), 10, LINE_AA);
 	
-		// mid_points.data(mpoints);
+	// mid_points.data(mpoints);
 	geometry_msgs::PoseArray mid_points;
 	for(int i=0; i<mpoints.size(); i++)
 	{	
@@ -436,8 +481,9 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 		}
 	}
 	if(trigger){
-		if(abs(l_max - l_min) >threshold_distance || abs(r_max - r_min) > threshold_distance ){
+		if(abs(l_max - l_min) > threshold_distance || abs(r_max - r_min) > threshold_distance){
 			state = WAYPOINT_DRIVING;
+			cout << "Left Lane diff : " << abs(l_max - l_min) << ", Right Lane diff : " << abs(r_max - r_min) << endl;
 			cout << "Too Long between max & min" << endl;
 		}
 		else {
@@ -480,6 +526,7 @@ void LaneDetection::ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 		Mat result_img = InversePerspective(search_img, base_img);
 
 		imshow("RESULT Image", result_img);
+		imshow("Histogram Image", hist_img);
 		imshow("Sliding Window Image", search_img);
  	
 		waitKey(30); 

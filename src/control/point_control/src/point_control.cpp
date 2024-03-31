@@ -14,6 +14,9 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
+#include <std_msgs/Int64.h>
+
+#define SPEED  30
 
 class PointControl {
   private:
@@ -30,9 +33,16 @@ class PointControl {
 
     ros::Subscriber sub_midpoint;
     geometry_msgs::PoseArray midpoint;
-    int following_state = 20;
+    int following_state = 21;
     ros::Publisher point_pub;
     visualization_msgs::Marker line_mid_point;
+    ros::Subscriber sub_state;
+    int state = 0;
+    double mid_point_marker_x = 0.0;
+    double mid_point_marker_y = 0.0;
+    double ego_vehicle_x = 0.0;
+    double ego_vehicle_y = 0.0;
+    double ego_yaw = 0.0;
 
   public:
     PointControl();
@@ -42,7 +52,7 @@ class PointControl {
     void visualize_waypoint();  //waypoint marker 띄우는 함수
     void odom_Callback(const nav_msgs::Odometry::ConstPtr& odom_msg);  //현재 좌표와 타겟좌표
     double cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg);  //yaw값 구하는 함수
-    void coordinate_tf(const nav_msgs::Odometry::ConstPtr& odom_msg);  //좌표 변환 함수
+    void coordinate_tf();  //좌표 변환 함수
     void next_point();  //다음 waypoint 
     void pure_pursuit();
     void speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg);  //현재 속도
@@ -51,6 +61,8 @@ class PointControl {
 
     void point_Callback(const geometry_msgs::PoseArray::ConstPtr& line_msg);
     void calc_midpoint();
+    void mid_point_marker();
+    void state_Callback(const std_msgs::Int64::ConstPtr& state_msg);
 };
 
 PointControl::PointControl() {
@@ -60,7 +72,8 @@ PointControl::PointControl() {
     control_pub = nh.advertise<carla_msgs::CarlaEgoVehicleControl>("/carla/ego_vehicle/vehicle_control_cmd", 100);
 
     sub_midpoint = nh.subscribe("/mid_point", 100, &PointControl::point_Callback, this);
-    point_pub = nh.advertise<visualization_msgs::Marker>("point_marker", 100);
+    point_pub = nh.advertise<visualization_msgs::Marker>("/point_marker", 100);
+    sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
 }
 
 void PointControl::waypoint() {
@@ -153,15 +166,18 @@ void PointControl::odom_Callback(const nav_msgs::Odometry::ConstPtr& odom_msg) {
     // ROS_INFO("ego_vehicle.x = %f", odom_msg->pose.pose.position.x);
     // ROS_INFO("ego_vehicle.y = %f \n", odom_msg->pose.pose.position.y);
 
+    ego_vehicle_x = odom_msg->pose.pose.position.x;
+    ego_vehicle_y = odom_msg->pose.pose.position.y;
+    ego_yaw = cal_yaw(odom_msg);
 
     // ROS_INFO("waypoint coordinate from vehicle ");
     // ROS_INFO("target.x: %f", co_tf_x);
     // ROS_INFO("target.y: %f \n", co_tf_y);
-    if (following_state == 20) {
+    if (following_state == 21) {
         calc_midpoint();
     }
-    else if (following_state == 21) {
-        coordinate_tf(odom_msg);
+    else if (following_state == 20) {
+        coordinate_tf();
     }
     pure_pursuit();
 
@@ -185,17 +201,15 @@ double PointControl::cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg) {
     return yaw;
 }
 
-void PointControl::coordinate_tf(const nav_msgs::Odometry::ConstPtr& odom_msg) {
-    double current_point_x, current_point_y, ego_vehicle_x, ego_vehicle_y, x, y, a, d;
+void PointControl::coordinate_tf() {
+    double current_point_x, current_point_y, x, y, a, d;
     double ld = 5.0;  //look ahead distance
 
     current_point_x = next_point_x;
     current_point_y = next_point_y;
-    ego_vehicle_x = odom_msg->pose.pose.position.x;
-    ego_vehicle_y = odom_msg->pose.pose.position.y;
     x = current_point_x - ego_vehicle_x;
     y = current_point_y - ego_vehicle_y;
-    a = atan2(y, x) - cal_yaw(odom_msg);
+    a = atan2(y, x) - ego_yaw;
     d = sqrt( pow(x, 2) + pow(y, 2) );
     
     co_tf_x = d * cos(a) + 1.44999998807907104;  //뒷바퀴 기준
@@ -218,12 +232,12 @@ void PointControl::next_point() {
     waypoint_count++;
 
 
-    ROS_INFO("========= next_point");
+    ROS_INFO("next_point");
 }
 
 void PointControl::pure_pursuit(){
     double L, d;
-    L = 3.0046487138904976;  //wheelbase
+    L = 2.66503413435;  //wheelbase
     d = sqrt( pow(co_tf_x, 2) + pow(co_tf_y, 2) );  //target distance from 뒷바퀴
     angle = - atan2( 2 * co_tf_y * L, pow(d, 2) ) * (2 / M_PI);
 }
@@ -241,7 +255,7 @@ void PointControl::PID(const std_msgs::Float32::ConstPtr& speed_msg){
     
     double delta_time = 0.01;   
     double high = 0.1;
-    target_speed = 20.0 / 3.6;
+    target_speed = SPEED / 3.6;
 
     current_speed = speed_msg->data;
     error = target_speed - current_speed;
@@ -288,7 +302,7 @@ void PointControl::point_Callback(const geometry_msgs::PoseArray::ConstPtr& line
 
 void PointControl::calc_midpoint() {
     int num = midpoint.poses.size();
-    ROS_INFO("==================midpoint size = %i", num);
+    ROS_INFO("midpoint size = %i", num);
     double sum_x, sum_y;
     double pixel_x, pixel_y;
     double dis_x, dis_y;
@@ -299,8 +313,8 @@ void PointControl::calc_midpoint() {
         y = midpoint.poses[i].position.y;
         sum_x += x;
         sum_y += y;
-        // ROS_INFO("==================x = %f", x);
-        // ROS_INFO("==================y = %f", y);
+        // ROS_INFO("x = %f", x);
+        // ROS_INFO("y = %f", y);
     }
     pixel_x = sum_x / (num - 1);
     pixel_y = sum_y / (num - 1);
@@ -309,30 +323,50 @@ void PointControl::calc_midpoint() {
     co_tf_x = dis_x + 2.0;  // 몇m 앞으로 떨어져 있는지
     co_tf_y = dis_y - (5.25/2);
 
-    ROS_INFO("==================co_tf_x = %f", co_tf_x);
-    ROS_INFO("==================co_tf_y = %f", co_tf_y);
+    ROS_INFO("co_tf_x = %f", co_tf_x);
+    ROS_INFO("co_tf_y = %f", co_tf_y);
+}
+
+void PointControl::mid_point_marker() {
+    double x, y, d_x, d_y, a, d;
     
-    //////////////////////////////////////////////////
+    x = co_tf_x - 1.206373665536404;  //뒷바퀴 기준
+    y = co_tf_y;
+    d = sqrt( pow(x, 2) + pow(y, 2) );
+    a = atan2(y, x) + ego_yaw;
+    d_x = d * cos(a);
+    d_y = d * sin(a);
+
+    mid_point_marker_x = d_x + ego_vehicle_x;
+    mid_point_marker_y = d_y + ego_vehicle_y;
+
+    ROS_INFO("mid_point_marker_x = %f", mid_point_marker_x);
+    ROS_INFO("mid_point_marker_y = %f", mid_point_marker_y);
+
     line_mid_point.header.frame_id = "map";
     line_mid_point.header.stamp = ros::Time::now();
     line_mid_point.action = visualization_msgs::Marker::ADD;
     line_mid_point.pose.orientation.w = 1.0;
-    line_mid_point.id = 0;
+    line_mid_point.id = 1;
     line_mid_point.type = visualization_msgs::Marker::POINTS;
 
-    line_mid_point.scale.x = 1.0;
-    line_mid_point.scale.y = 1.0;
-    line_mid_point.scale.z = 1.0;
+    line_mid_point.scale.x = 10.0;
+    line_mid_point.scale.y = 10.0;
+    line_mid_point.scale.z = 10.0;
 
-    // line_mid_point is blue
-    line_mid_point.color.b = 1.0;
+    // line_mid_point is red
+    line_mid_point.color.r = 1.0;
     line_mid_point.color.a = 1.0;
 
     // TODO: co_tf_x,y를 odom 정보 써서 world 좌표로 변환
-    line_mid_point.pose.position.x = co_tf_x;
-    line_mid_point.pose.position.y = co_tf_y;
+    line_mid_point.pose.position.x = mid_point_marker_x;
+    line_mid_point.pose.position.y = mid_point_marker_y;
 
     point_pub.publish(line_mid_point);
+}
+
+void PointControl::state_Callback(const std_msgs::Int64::ConstPtr& state_msg) {
+    following_state = state_msg->data;
 }
 
 int main( int argc, char** argv ) {
@@ -343,6 +377,7 @@ int main( int argc, char** argv ) {
 
     while(ros::ok()) {
         point_control.visualize_waypoint();
+        point_control.mid_point_marker();
         point_control.control();
         ros::spinOnce();
         loop_rate.sleep();

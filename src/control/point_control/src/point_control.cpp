@@ -8,28 +8,52 @@ PointControl::PointControl() {
 
     sub_midpoint = nh.subscribe("/mid_point", 100, &PointControl::point_Callback, this);
     point_pub = nh.advertise<visualization_msgs::Marker>("/point_marker", 100);
+    purepursuit_point_pub = nh.advertise<visualization_msgs::Marker>("/purepursuit_point_marker", 100);
     sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
+    sliding_window_error_pub = nh.advertise<std_msgs::Float32>("/sliding_window_error",100);
+}
+
+std::vector<double> PointControl::WGS84toCartesian(double input_lat, double input_long) {
+    std::array<double, 2> WGS84Position {input_lat, input_long};
+    std::array<double, 2> cartesian_position {wgs84::toCartesian(WSG84Reference, WGS84Position)};
+
+    std::vector<double> XY;
+    XY.push_back(cartesian_position[0]);
+    XY.push_back(cartesian_position[1]);
+    
+    ROS_INFO("x = %f", cartesian_position[0]);
+    ROS_INFO("y = %f", cartesian_position[1]);
+    
+    return XY;
 }
 
 void PointControl::waypoint() {
-    std::ifstream in("/home/baek/Carla_Internship/catkin_ws/src/waypoint_publisher/xy.txt");  
-    
+    std::ifstream in("/home/baek/Downloads/waypoint_center.txt");
+
     if (!in.is_open()) {
-        ROS_ERROR("x,y file not found!");
+        ROS_ERROR("waypoint file not found!");
     }
     else {
         std::cout << "file reading complete!" << "\n";
     }
     
-    std::string xy_filter;
+    std::string lat_long;
     while (in) {
-        getline(in, xy_filter);  //xy_filter 문자열에 한줄씩 저장
-        std::vector<double> xy;
-        std::vector<std::string> xy_vec = divide(xy_filter, '\t');  //한 줄씩 있는 xy_filter를 tab으로 x와 y 좌표 나눔
-        for (typename std::vector<std::string>::iterator itr = xy_vec.begin(); itr != xy_vec.end(); ++itr) {
-            xy.push_back(to_num(*itr));
+        getline(in, lat_long);  // latitude, longitude data 문자열에 한줄씩 저장
+        std::vector<double> ll;
+        std::vector<std::string> ll_vec = divide(lat_long, ',');  //한 줄씩 있는 latitude, longitude data를 ,로 x와 y 좌표 나눔
+        std::vector<double> map_XY;  // vector include waypoint (x, y)
+        
+        for (typename std::vector<std::string>::iterator itr = ll_vec.begin(); itr != ll_vec.end(); ++itr) {
+            ll.push_back(to_num(*itr));
+            
+            double input_lat, input_long;
+            input_lat = ll[0];
+            input_long = ll[1];
+            map_XY = WGS84toCartesian(input_lat, input_long);
+            // map_XY.push_back(index);
         }
-        waypoint_vec.push_back(xy);
+        waypoint_vec.push_back(map_XY);
     }
 }
 
@@ -92,7 +116,7 @@ void PointControl::visualize_waypoint(){
         points.points.push_back(p);   
         line_strip.points.push_back(p);
     }
-    waypoint_pub.publish(points);
+    // waypoint_pub.publish(points);
     waypoint_pub.publish(line_strip);
 }
 
@@ -142,7 +166,7 @@ void PointControl::coordinate_tf() {
     a = atan2(y, x) - ego_yaw;
     d = sqrt( pow(x, 2) + pow(y, 2) );
     
-    co_tf_x = d * cos(a) + 1.44999998807907104;  //뒷바퀴 기준
+    co_tf_x = d * cos(a) + 1.206373665536404;  //뒷바퀴 기준
     co_tf_y = d * sin(a);
 
     if (d <= ld) {
@@ -181,14 +205,16 @@ void PointControl::pure_pursuit(){
 
     if (following_state == 21) {
         angle = mid_angle;
-        ROS_INFO("follow_line");
+        // ROS_INFO("follow_line");
     }
     else if (following_state == 20) {
         angle = waypoint_angle;
-        ROS_INFO("follow_waypoint");
+        // ROS_INFO("follow_waypoint");
     }
-    ROS_INFO("following_state = %i", following_state);
-    ROS_INFO("-----------------------------------\n");
+    // ROS_INFO("following_state = %i", following_state);
+    // ROS_INFO("next_point_x = %f", next_point_x);
+    // ROS_INFO("next_point_y = %f", next_point_y);
+    // ROS_INFO("-----------------------------------\n");
 }
 
 void PointControl::speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg) {
@@ -275,6 +301,30 @@ void PointControl::calc_midpoint() {
     // ROS_INFO("mid_co_tf_x = %f", mid_co_tf_x);
     // ROS_INFO("mid_co_tf_y = %f", mid_co_tf_y);
 }
+void PointControl::purepursuit_point_marker() {
+    purepursuit_point.header.frame_id = "map";
+    purepursuit_point.header.stamp = ros::Time::now();
+    purepursuit_point.action = visualization_msgs::Marker::ADD;
+    purepursuit_point.pose.orientation.w = 1.0;
+    purepursuit_point.id = 0;
+    purepursuit_point.type = visualization_msgs::Marker::POINTS;
+
+    purepursuit_point.scale.x = 1.0;
+    purepursuit_point.scale.y = 1.0;
+    purepursuit_point.scale.z = 1.0;
+
+    // purepursuit_point is red
+    purepursuit_point.color.g = 1.0;
+    purepursuit_point.color.a = 1.0;
+    
+    purepursuit_point.points.clear();
+    geometry_msgs::Point point;
+    point.x = next_point_x;
+    point.y = next_point_y;
+    purepursuit_point.points.push_back(point);
+
+    purepursuit_point_pub.publish(purepursuit_point);
+}
 
 void PointControl::mid_point_marker() {
     double x, y, d_x, d_y, a, d;
@@ -296,7 +346,7 @@ void PointControl::mid_point_marker() {
     line_mid_point.header.stamp = ros::Time::now();
     line_mid_point.action = visualization_msgs::Marker::ADD;
     line_mid_point.pose.orientation.w = 1.0;
-    line_mid_point.id = 1;
+    line_mid_point.id = 0;
     line_mid_point.type = visualization_msgs::Marker::POINTS;
 
     line_mid_point.scale.x = 1.0;
@@ -320,6 +370,29 @@ void PointControl::state_Callback(const std_msgs::Int64::ConstPtr& state_msg) {
     following_state = state_msg->data;
 }
 
+void PointControl::calc_sliding_window_near_point() {
+    sliding_window_near_point_x = next_point_x;
+    sliding_window_near_point_y = next_point_y;
+}
+
+void PointControl::calc_sliding_window_error() {
+    calc_sliding_window_near_point();
+    double x, y, d;
+    x = mid_point_marker_x - sliding_window_near_point_x;
+    y = mid_point_marker_y - sliding_window_near_point_y;
+    d = sqrt( pow(x, 2) + pow(y, 2) );
+    sliding_window_error = d;
+    sliding_window_error_msg.data = sliding_window_error;
+    sliding_window_error_pub.publish(sliding_window_error_msg);
+}
+
+void PointControl::publish() {
+    visualize_waypoint();
+    mid_point_marker();
+    purepursuit_point_marker();
+    calc_sliding_window_error();
+}
+
 int main( int argc, char** argv ) {
     ros::init(argc, argv, "point_control");
     PointControl point_control;
@@ -327,8 +400,7 @@ int main( int argc, char** argv ) {
     ros::Rate loop_rate(30);  //1초에 30번
 
     while(ros::ok()) {
-        point_control.visualize_waypoint();
-        point_control.mid_point_marker();
+        point_control.publish();
         point_control.control();
         ros::spinOnce();
         loop_rate.sleep();

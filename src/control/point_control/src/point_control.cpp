@@ -241,7 +241,7 @@ void PointControl::PID(const std_msgs::Float32::ConstPtr& speed_msg){
     
     double delta_time = 0.01;   
     double high = 0.1;
-    target_speed = 35.0 / 3.6;
+    target_speed = 20.0 / 3.6;
 
     current_speed = speed_msg->data;
     error = target_speed - current_speed;

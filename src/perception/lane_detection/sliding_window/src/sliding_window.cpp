@@ -33,7 +33,7 @@ class LaneDetection{
 		int h =  500;
 		int prev_left_index = 0;
 		int prev_right_index = 0;
-		int state = 0;
+		std_msgs::Int64 state;
 		bool trigger = true;
 		int max_left_index = 0, max_right_index = 0;
 
@@ -234,12 +234,12 @@ Mat LaneDetection::GetHistImage(const Mat& img){
 	if(max_left == 0 && max_right == 0){
 		max_left_index = prev_left_index;
 		max_right_index = prev_right_index;
-		state = WAYPOINT_DRIVING;
+		state.data = WAYPOINT_DRIVING;
 		cout << "차선 인지 불가" << endl;
 		trigger =false;
 	}
 	else{
-		state = LANE_POINT_DRIVING;
+		state.data = LANE_POINT_DRIVING;
 		cout << "차선 인지 성공" << endl;
 	}
 	left_start_index = max_left_index;
@@ -482,15 +482,16 @@ Mat LaneDetection::SlidingWindow(Mat& binarized_image){
 	}
 	if(trigger){
 		if(abs(l_max - l_min) > threshold_distance || abs(r_max - r_min) > threshold_distance){
-			state = WAYPOINT_DRIVING;
+			state.data = WAYPOINT_DRIVING;
 			cout << "Left Lane diff : " << abs(l_max - l_min) << ", Right Lane diff : " << abs(r_max - r_min) << endl;
 			cout << "Too Long between max & min" << endl;
 		}
 		else {
-			state = LANE_POINT_DRIVING;
+			state.data = LANE_POINT_DRIVING;
 			cout << "Lane follow !!" << endl;
 		}
 	}
+	pub_state.publish(state);
 
 	geometry_msgs::Pose temp;
 	temp.position.x = 0.0;

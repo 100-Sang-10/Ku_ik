@@ -35,7 +35,7 @@ class PointControl {
     geometry_msgs::PoseArray midpoint;
     int following_state = 21;
     ros::Publisher point_pub;
-    visualization_msgs::Marker line_mid_point;
+    
     ros::Subscriber sub_state;
     int state = 0;
     double mid_point_marker_x = 0.0;
@@ -342,7 +342,7 @@ void PointControl::mid_point_marker() {
 
     ROS_INFO("mid_point_marker_x = %f", mid_point_marker_x);
     ROS_INFO("mid_point_marker_y = %f", mid_point_marker_y);
-
+    visualization_msgs::Marker line_mid_point;
     line_mid_point.header.frame_id = "map";
     line_mid_point.header.stamp = ros::Time::now();
     line_mid_point.action = visualization_msgs::Marker::ADD;
@@ -359,8 +359,12 @@ void PointControl::mid_point_marker() {
     line_mid_point.color.a = 1.0;
 
     // TODO: co_tf_x,y를 odom 정보 써서 world 좌표로 변환
-    line_mid_point.pose.position.x = mid_point_marker_x;
-    line_mid_point.pose.position.y = mid_point_marker_y;
+    geometry_msgs::Point point;
+    point.x = mid_point_marker_x;
+    point.y = mid_point_marker_y;
+    point.z = 0.0;  // Assuming z-coordinate is 0 in 2D
+
+    line_mid_point.points.push_back(point);
 
     point_pub.publish(line_mid_point);
 }

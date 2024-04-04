@@ -33,6 +33,7 @@ class PointControl {
     double angle, co_tf_x, co_tf_y, accelerator, mid_co_tf_x, mid_co_tf_y;
     double next_point_x = init_position_x;
     double next_point_y = init_position_y;
+    double mid_angle, waypoint_angle;
     int waypoint_count = 0;
     
     // use for convert WSG84 to Cartesian

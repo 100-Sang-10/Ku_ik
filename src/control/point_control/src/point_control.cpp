@@ -28,7 +28,7 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
 }
 
 void PointControl::waypoint() {
-    std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
+    std::ifstream in("/home/eonsoo/Ku_ik/resources/waypoint_center.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
@@ -190,7 +190,7 @@ void PointControl::next_point() {
 }
 
 void PointControl::pure_pursuit(){
-    double mid_angle, waypoint_angle;
+    
 
     calc_midpoint();
     coordinate_tf();
@@ -383,6 +383,12 @@ void PointControl::calc_sliding_window_error() {
     d = sqrt( pow(x, 2) + pow(y, 2) );
     sliding_window_error = d;
     sliding_window_error_msg.data = sliding_window_error;
+    if(sliding_window_error_msg.data >= 0.4){
+        following_state = 20;
+        angle = waypoint_angle;
+    }
+   
+        
     sliding_window_error_pub.publish(sliding_window_error_msg);
 }
 

@@ -54,7 +54,7 @@ class GlobalPlanning{
       left_marker_pub = nh.advertise<visualization_msgs::Marker>("left_marker", 10);
       center_marker_pub = nh.advertise<visualization_msgs::Marker>("center_marker", 10);
       right_marker_pub = nh.advertise<visualization_msgs::Marker>("right_marker", 10);
-      center_line_pub = nh.advertise<geometry_msgs::PoseArray>("center line point", 10);
+      center_line_pub = nh.advertise<geometry_msgs::PoseArray>("center_line_point", 10);
 
       map = load("/home/eonsoo/Ku_ik/src/planning/global_planning/src/Town05.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
@@ -88,12 +88,12 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   switch (from_address)
   {
   case A :
-    gps.lat = 0.00173466305149; //  -0.00072758317;
-    gps.lon = 0.000622928226931; // 0.0020453343;
+    gps.lat =-0.00072758317; // 0.00173466305149; //  
+    gps.lon = 0.0020453343;//0.000622928226931; // 
     break;
   case B :
-    gps.lat = -0.00171244438533; // 0.00007413843;
-    gps.lon = 0.000399127055247; //0.00121679525;
+    gps.lat = 0.00007413843;//-0.00171244438533; //
+    gps.lon = 0.00121679525; //0.000399127055247; //
   default:
     break;
   }
@@ -119,15 +119,15 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
 
   switch (to_address)
   {
-  case A :
-    gps.lat = 0.00173466305149; //  -0.00072758317;
-    gps.lon = 0.000622928226931; // 0.0020453343;
-    break;
-  case B :
-    gps.lat = -0.00171244438533; // 0.00007413843;
-    gps.lon = 0.000399127055247; //0.00121679525;
-  default:
-    break;
+    case A :
+      gps.lat =-0.00072758317; // 0.00173466305149; //  
+      gps.lon = 0.0020453343;//0.000622928226931; // 
+      break;
+    case B :
+      gps.lat = 0.00007413843;//-0.00171244438533; //
+      gps.lon = 0.00121679525; //0.000399127055247; //
+    default:
+      break;
   }
  
   std::cout << "To address : " << to_address;
@@ -138,14 +138,33 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   std::cout << "to_utm_x : " << to_utm_x << ", to_utm_y : " << to_utm_y << std::endl;
   std::cout << "-----------------------" << std::endl;
   Lanelets to_lanelets = map->laneletLayer.nearest(BasicPoint2d(to_utm_x, to_utm_y), 1);
- 
-  ConstLanelet fromLanelet = from_lanelets[0];
-  ConstLanelet toLanelet = to_lanelets[0];
-  // ConstLanelet fromLanelet = map->laneletLayer.get(10319);
-  // ConstLanelet toLanelet = map->laneletLayer.get(19871);
+  // ConstLanelet fromLanelet = from_lanelets[0];
+  // ConstLanelet toLanelet = to_lanelets[0];
+  
+  LineString3d middleLs{map->lineStringLayer.get(16628)};
+  LineString3d middleNextLs{map->lineStringLayer.get(10894)};
+  Lanelet fromLanelet = map->laneletLayer.get(17447);
+  Lanelet toLanelet = map->laneletLayer.get(16629);
+  Lanelet nextToLanelet = map->laneletLayer.get(10895);
+  Lanelet nextFromLanelet= map->laneletLayer.get(10911);
+  middleLs.attributes()[AttributeName::Type] = AttributeValueString::LineThin;
+  middleLs.attributes()[AttributeName::Subtype] = AttributeValueString::Dashed;
+  middleNextLs = middleLs;
+  toLanelet.attributes()[AttributeName::Type] = AttributeValueString::Lanelet;
+  toLanelet.attributes()[AttributeName::Subtype] = AttributeValueString::Road;
+  toLanelet.attributes()[AttributeName::Location] = AttributeValueString::Nonurban;
+  fromLanelet.attributes() = toLanelet.attributes();
+  nextToLanelet.attributes() = toLanelet.attributes();
+  toLanelet.attributes()[AttributeName::OneWay] = false;
+  nextToLanelet.attributes()[AttributeName::OneWay] = false;
+  
+
+
+  assert(trafficRules->canChangeLane(fromLanelet, toLanelet));
   // cout << fromLanelet.leftBound().id() << endl;
   // cout << toLanelet.leftBound().id() << endl;
-  Optional<routing::LaneletPath> shortestPath = graph->shortestPath(fromLanelet, toLanelet, 1);
+  Optional<routing::LaneletPath> shortestPath = graph->shortestPath(toLanelet, nextFromLanelet, 1, true);
+  assert(shortestPath.has_value());
   // GlobalPlanning 클래스 정의 내부에
   std::vector<BasicPoint2d> centerlinePoints;
   std::vector<BasicPoint2d> leftlinePoints;
@@ -178,7 +197,7 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   VisualizeLeftLine(leftlinePoints);
   VisualizeRightLine(rightlinePoints);
 
-  Optional<routing::Route> route = graph->getRoute(fromLanelet, toLanelet, 0);
+  Optional<routing::Route> route = graph->getRoute(toLanelet, nextFromLanelet, 1, true);
   // routing::LaneletPath shortest_path = route->shortestPath();
   // LaneletSequence fullLane = route->fullLane(fromLanelet);
   // assert(!shortest_path.empty());

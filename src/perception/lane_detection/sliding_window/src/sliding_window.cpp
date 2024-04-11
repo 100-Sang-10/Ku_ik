@@ -70,7 +70,7 @@ class LaneDetection{
 		cv::Mat SlidingWindow(Mat& binarized_image);
 		cv::Mat InversePerspective(Mat& input_img, Mat& output_img);
 		void ImageCallback(const sensor_msgs::ImageConstPtr& msg);
-
+		void Image(Mat& msg);
 };
 
 
@@ -82,6 +82,11 @@ Mat LaneDetection::Perspective(Mat& src) {
 	src_pts[1] = Point2f(640, 460);
 	src_pts[2] = Point2f(770, 560);
 	src_pts[3] = Point2f(30, 560);
+
+	// src_pts[0] = Point2f(280, 380);
+	// src_pts[1] = Point2f(420, 380);
+	// src_pts[2] = Point2f(530, 480);
+	// src_pts[3] = Point2f(160, 480);
 
 	dst_pts[0] = Point2f(0, 0);
 	dst_pts[1] = Point2f(w-1, 0);
@@ -104,6 +109,10 @@ Mat LaneDetection::Perspective(Mat& src) {
 Mat LaneDetection::RGB2Gray(Mat& image){
     Mat gray_img;
     cvtColor(image, gray_img, COLOR_BGR2GRAY);
+	
+	// Scalar lower_black = cv::Scalar(0, 5, 100);
+	// Scalar upper_black = cv::Scalar(179, 40, 255);
+	// inRange(image, lower_black, upper_black, gray_img);
     return gray_img;
 };
 
@@ -539,13 +548,65 @@ void LaneDetection::ImageCallback(const sensor_msgs::ImageConstPtr& msg){
 
 };
 
+void LaneDetection::Image(Mat& msg){
+	
+		Mat gray_img = RGB2Gray(msg);
+		Mat filtered_img = GaussianFilter(gray_img);
+		Mat contrast_img = Contrast(filtered_img);	
+		Mat perspect_img = Perspective(contrast_img);
+		Mat binary_img = Binarize(perspect_img);
+		Mat roi_img = RegionOfInterest(binary_img);
+		Mat hist_img = GetHistImage(roi_img);
+		Mat search_img = SlidingWindow(roi_img);
+		Mat result_img = InversePerspective(search_img, msg);
+		imshow("perspective Image", perspect_img);
+		imshow("RESULT Image", result_img);
+		imshow("Histogram Image", hist_img);
+		imshow("Sliding Window Image", search_img);
+}
+
 int main (int argc, char** argv){
 
 	ros::init(argc, argv, "sliding_window_node");
 	LaneDetection l;
+	// VideoCapture cap("/home/eonsoo/Ku_ik/src/perception/lane_detection/sliding_window/src/blackbox1_0_no_audio.mp4");
+
+	// if (!cap.isOpened())
+	// {
+	// 	std::cout << "Can't open video !!!" << std::endl;
+	// 	return -1;
+	// }
+
+	// Mat src;
+
+	// float videoFPS = cap.get(CAP_PROP_FPS);
+	// int videoWidth = cap.get(CAP_PROP_FRAME_WIDTH);
+	// int videoHeight = cap.get(CAP_PROP_FRAME_HEIGHT);
+	
+	
+    // std::cout << "videoHeight : " << videoHeight << ", videoWidth : " << videoWidth<< std::endl;
+
+
+	// //VideoWriter outputVideo("output.avi", fourcc, fps, Size(w, h));
+	// while (ros::ok())
+	// {	
+	// 	cap >> src ;
+	// 	resize(src, src, cv::Size(800, 600));
+	// 	l.Image(src);
+		
+
+
+	// 	if (waitKey(1000 / videoFPS) == 27) {
+	// 		std::cout << "Stop Video" << std::endl;
+	// 		break;
+	// 		}
+		
+	// }
 	while (ros::ok())
-	{
+	{	
 		ros::spinOnce();
+		
 	}
+
 
 }

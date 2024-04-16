@@ -24,6 +24,7 @@
 
 // we want assert statements to work in release mode
 #undef NDEBUG
+
 #define A       71
 #define B       72
 #define LEFT    11
@@ -74,7 +75,7 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   
   projection::UtmProjector projection(Origin({0, 0}));
   GPSPoint gps;
-
+  
   /*****************시작 포인트 정보 입력*******************/
 
   int from_address;
@@ -88,17 +89,18 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   switch (from_address)
   {
   case A :
-    gps.lat =-0.00072758317; // 0.00173466305149; //  
-    gps.lon = 0.0020453343;//0.000622928226931; // 
+    gps.lat =  -0.00167949528873; //  -0.00072758317;
+    gps.lon = 0.000136853647009; // 0.0020453343;
     break;
   case B :
-    gps.lat = 0.00007413843;//-0.00171244438533; //
-    gps.lon = 0.00121679525; //0.000399127055247; //
+    gps.lat = 0.00173246790322; //0.00007413843;
+    gps.lon = 0.00010879227316; //0.00121679525;
+    break;
   default:
     break;
   }
  
-  std::cout << "From address : " << from_address;
+  std::cout << "From address : " << from_address << std::endl;
   std::cout << "From latitude : " << gps.lat << ", From longitude : " << gps.lon << std::endl;
   
   from_utm_x = projection.forward(gps).x();
@@ -117,20 +119,22 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
             << "Write from address number : ";
   std::cin >> to_address;
 
-  switch (to_address)
-  {
+  switch (from_address)
+    {
     case A :
-      gps.lat =-0.00072758317; // 0.00173466305149; //  
-      gps.lon = 0.0020453343;//0.000622928226931; // 
+      gps.lat =  -0.00167949528873; //  -0.00072758317;
+      gps.lon = 0.000136853647009; // 0.0020453343;
       break;
     case B :
-      gps.lat = 0.00007413843;//-0.00171244438533; //
-      gps.lon = 0.00121679525; //0.000399127055247; //
+      gps.lat = 0.00173246790322; //0.00007413843;
+      gps.lon = 0.00010879227316; //0.00121679525;
+      break;
     default:
       break;
+  
   }
  
-  std::cout << "To address : " << to_address;
+  std::cout << "To address : " << to_address << std::endl;
   std::cout << "To latitude : " << gps.lat << ", To longitude : " << gps.lon << std::endl;
   
   to_utm_x = projection.forward(gps).x();
@@ -138,32 +142,30 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   std::cout << "to_utm_x : " << to_utm_x << ", to_utm_y : " << to_utm_y << std::endl;
   std::cout << "-----------------------" << std::endl;
   Lanelets to_lanelets = map->laneletLayer.nearest(BasicPoint2d(to_utm_x, to_utm_y), 1);
-  // ConstLanelet fromLanelet = from_lanelets[0];
-  // ConstLanelet toLanelet = to_lanelets[0];
+  ConstLanelet fromLanelet = from_lanelets[0];
+  ConstLanelet toLanelet = to_lanelets[0];
   
-  LineString3d middleLs{map->lineStringLayer.get(16628)};
-  LineString3d middleNextLs{map->lineStringLayer.get(10894)};
-  Lanelet fromLanelet = map->laneletLayer.get(17447);
-  Lanelet toLanelet = map->laneletLayer.get(16629);
-  Lanelet nextToLanelet = map->laneletLayer.get(10895);
-  Lanelet nextFromLanelet= map->laneletLayer.get(10911);
-  middleLs.attributes()[AttributeName::Type] = AttributeValueString::LineThin;
-  middleLs.attributes()[AttributeName::Subtype] = AttributeValueString::Dashed;
-  middleNextLs = middleLs;
-  toLanelet.attributes()[AttributeName::Type] = AttributeValueString::Lanelet;
-  toLanelet.attributes()[AttributeName::Subtype] = AttributeValueString::Road;
-  toLanelet.attributes()[AttributeName::Location] = AttributeValueString::Nonurban;
-  fromLanelet.attributes() = toLanelet.attributes();
-  nextToLanelet.attributes() = toLanelet.attributes();
-  toLanelet.attributes()[AttributeName::OneWay] = false;
-  nextToLanelet.attributes()[AttributeName::OneWay] = false;
+  // LineString3d middleLs{map->lineStringLayer.get(16628)};
+  // LineString3d middleNextLs{map->lineStringLayer.get(10894)};
+  // Lanelet fromLanelet = map->laneletLayer.get(17447);
+  // Lanelet toLanelet = map->laneletLayer.get(16629);
+  // Lanelet nextToLanelet = map->laneletLayer.get(10895);
+  // Lanelet nextFromLanelet= map->laneletLayer.get(10911);
+  // middleLs.attributes()[AttributeName::Type] = AttributeValueString::LineThin;
+  // middleLs.attributes()[AttributeName::Subtype] = AttributeValueString::Dashed;
+  // middleNextLs = middleLs;
+  // toLanelet.attributes()[AttributeName::Type] = AttributeValueString::Lanelet;
+  // toLanelet.attributes()[AttributeName::Subtype] = AttributeValueString::Road;
+  // toLanelet.attributes()[AttributeName::Location] = AttributeValueString::Nonurban;
+  // fromLanelet.attributes() = toLanelet.attributes();
+  // nextToLanelet.attributes() = toLanelet.attributes();
+  // toLanelet.attributes()[AttributeName::OneWay] = false;
+  // nextToLanelet.attributes()[AttributeName::OneWay] = false;
   
-
-
-  assert(trafficRules->canChangeLane(fromLanelet, toLanelet));
-  // cout << fromLanelet.leftBound().id() << endl;
+  // assert(trafficRules->canChangeLane(fromLanelet, toLanelet));
+  // // cout << fromLanelet.leftBound().id() << endl;
   // cout << toLanelet.leftBound().id() << endl;
-  Optional<routing::LaneletPath> shortestPath = graph->shortestPath(toLanelet, nextFromLanelet, 1, true);
+  Optional<routing::LaneletPath> shortestPath = graph->shortestPath(fromLanelet, toLanelet, 1, true);
   assert(shortestPath.has_value());
   // GlobalPlanning 클래스 정의 내부에
   std::vector<BasicPoint2d> centerlinePoints;
@@ -197,7 +199,7 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   VisualizeLeftLine(leftlinePoints);
   VisualizeRightLine(rightlinePoints);
 
-  Optional<routing::Route> route = graph->getRoute(toLanelet, nextFromLanelet, 1, true);
+  Optional<routing::Route> route = graph->getRoute(toLanelet, fromLanelet, 1, true);
   // routing::LaneletPath shortest_path = route->shortestPath();
   // LaneletSequence fullLane = route->fullLane(fromLanelet);
   // assert(!shortest_path.empty());

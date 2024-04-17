@@ -57,7 +57,7 @@ class GlobalPlanning{
       right_marker_pub = nh.advertise<visualization_msgs::Marker>("right_marker", 10);
       center_line_pub = nh.advertise<geometry_msgs::PoseArray>("center_line_point", 10);
 
-      map = load("/home/eonsoo/Ku_ik/src/planning/global_planning/src/Town05.osm",  projection::UtmProjector(Origin({0, 0})));
+      map = load("/home/eonsoo/OSM File/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
       graph = routing::RoutingGraph::build(*map, *trafficRules);
     };
@@ -75,98 +75,43 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   
   projection::UtmProjector projection(Origin({0, 0}));
   GPSPoint gps;
-  
-  /*****************시작 포인트 정보 입력*******************/
-
-  int from_address;
-  float from_lat;
-  float from_lon;
-  float from_utm_x, from_utm_y;
-  std::cout << "----------Address----------- \n"
-            << " A : 71, B : 72 \n"
-            << "Write from address number : ";
-  std::cin >> from_address;
-  switch (from_address)
-  {
-  case A :
-    gps.lat =  -0.00167949528873; //  -0.00072758317;
-    gps.lon = 0.000136853647009; // 0.0020453343;
-    break;
-  case B :
-    gps.lat = 0.00173246790322; //0.00007413843;
-    gps.lon = 0.00010879227316; //0.00121679525;
-    break;
-  default:
-    break;
-  }
- 
-  std::cout << "From address : " << from_address << std::endl;
-  std::cout << "From latitude : " << gps.lat << ", From longitude : " << gps.lon << std::endl;
-  
-  from_utm_x = projection.forward(gps).x();
-  from_utm_y = projection.forward(gps).y();
-  std::cout << "from_utm_x : " << from_utm_x << ", from_utm_y : " << from_utm_y << std::endl;
-  std::cout << "-----------------------" << std::endl;
-  Lanelets from_lanelets = map->laneletLayer.nearest(BasicPoint2d(from_utm_x, from_utm_y), 1);
-  
-  /*****************도착 포인트 정보 입력*******************/
+  // /*****************도착 포인트 정보 입력*******************/
   int to_address;
   float to_lat;
   float to_lon; 
   double to_utm_x, to_utm_y;
+
   std::cout << "----------Address----------- \n"
             << " A : 71, B : 72 \n"
             << "Write from address number : ";
   std::cin >> to_address;
-
-  switch (from_address)
+  Point2d gps_point;
+  switch (to_address)
     {
     case A :
-      gps.lat =  -0.00167949528873; //  -0.00072758317;
-      gps.lon = 0.000136853647009; // 0.0020453343;
+      gps_point = map->pointLayer.get(21476);    
       break;
     case B :
-      gps.lat = 0.00173246790322; //0.00007413843;
-      gps.lon = 0.00010879227316; //0.00121679525;
+      gps.lat = 0.00011943097;
+      gps.lon = 0.00088110812;
       break;
     default:
       break;
   
   }
- 
+  to_utm_x =gps_point.basicPoint2d().x();
+  to_utm_y =gps_point.basicPoint2d().y();
+
   std::cout << "To address : " << to_address << std::endl;
-  std::cout << "To latitude : " << gps.lat << ", To longitude : " << gps.lon << std::endl;
-  
-  to_utm_x = projection.forward(gps).x();
-  to_utm_y = projection.forward(gps).y();
   std::cout << "to_utm_x : " << to_utm_x << ", to_utm_y : " << to_utm_y << std::endl;
+
   std::cout << "-----------------------" << std::endl;
+
   Lanelets to_lanelets = map->laneletLayer.nearest(BasicPoint2d(to_utm_x, to_utm_y), 1);
-  ConstLanelet fromLanelet = from_lanelets[0];
   ConstLanelet toLanelet = to_lanelets[0];
-  
-  // LineString3d middleLs{map->lineStringLayer.get(16628)};
-  // LineString3d middleNextLs{map->lineStringLayer.get(10894)};
-  // Lanelet fromLanelet = map->laneletLayer.get(17447);
-  // Lanelet toLanelet = map->laneletLayer.get(16629);
-  // Lanelet nextToLanelet = map->laneletLayer.get(10895);
-  // Lanelet nextFromLanelet= map->laneletLayer.get(10911);
-  // middleLs.attributes()[AttributeName::Type] = AttributeValueString::LineThin;
-  // middleLs.attributes()[AttributeName::Subtype] = AttributeValueString::Dashed;
-  // middleNextLs = middleLs;
-  // toLanelet.attributes()[AttributeName::Type] = AttributeValueString::Lanelet;
-  // toLanelet.attributes()[AttributeName::Subtype] = AttributeValueString::Road;
-  // toLanelet.attributes()[AttributeName::Location] = AttributeValueString::Nonurban;
-  // fromLanelet.attributes() = toLanelet.attributes();
-  // nextToLanelet.attributes() = toLanelet.attributes();
-  // toLanelet.attributes()[AttributeName::OneWay] = false;
-  // nextToLanelet.attributes()[AttributeName::OneWay] = false;
-  
-  // assert(trafficRules->canChangeLane(fromLanelet, toLanelet));
-  // // cout << fromLanelet.leftBound().id() << endl;
-  // cout << toLanelet.leftBound().id() << endl;
-  Optional<routing::LaneletPath> shortestPath = graph->shortestPath(fromLanelet, toLanelet, 1, true);
-  assert(shortestPath.has_value());
+  Lanelet fromLanelet = map->laneletLayer.get(16629); // 16629
+  // Lanelet nextFromLanelet= map->laneletLayer.get(21496);
+  Optional<routing::LaneletPath> shortestPath = graph->shortestPath(fromLanelet, toLanelet);
   // GlobalPlanning 클래스 정의 내부에
   std::vector<BasicPoint2d> centerlinePoints;
   std::vector<BasicPoint2d> leftlinePoints;
@@ -178,35 +123,61 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   if (shortestPath) {
       centerlinePoints.clear(); // 새로운 점들을 추가하기 전에 기존의 점들을 초기화합니다.
       // 최단 경로의 각 lanelet을 순회합니다
+      int r_index = 0; 
+      int c_index = 0;
+      int l_index = 0;
+      int p_index = 0; 
+    
+      int path_size = shortestPath->size();
+      std::cout << "path size : " << path_size << std::endl;
+
       for (const auto& lanelet : *shortestPath) {
           // 현재 lanelet의 중앙선을 가져옵니다
           auto centerline = lanelet.centerline();    
           auto leftline = lanelet.leftBound();
-          auto rightline = lanelet.rightBound(); 
+          auto rightline = lanelet.rightBound();
+          // std::cout << rightline << std::endl;
           // 중앙선의 각 점을 벡터에 추가합니다
-          for (const auto& point : centerline) {
-            centerlinePoints.push_back(point.basicPoint2d());
-          }
-          for (const auto& point : leftline) {
-            leftlinePoints.push_back(point.basicPoint2d());
-          }
           for (const auto& point : rightline) {
             rightlinePoints.push_back(point.basicPoint2d());
+            r_index++;
+            if(point.x() == to_utm_x && point.y() == to_utm_y){
+              break;
+            }
           }
-      } 
+
+          for (const auto& point : centerline) {
+            centerlinePoints.push_back(point.basicPoint2d());
+            double distance = sqrt(pow((to_utm_x - point.x()),2) + pow((to_utm_y - point.y()),2));
+            c_index++;
+            if(distance <3.2){
+              break;
+            }
+          }
+
+          for (const auto& point : leftline) {
+            leftlinePoints.push_back(point.basicPoint2d());
+            double distance = sqrt(pow((to_utm_x - point.x()),2) + pow((to_utm_y - point.y()),2));
+            l_index++;
+            if(distance <6.){
+              break;
+            }
+          }
+          p_index++;
+      }
+     
   }
+  // std::cout << centerlinePoints[0].x() <<", "<< centerlinePoints[0].y() << std::endl;
 
   VisualizeLeftLine(leftlinePoints);
   VisualizeRightLine(rightlinePoints);
 
-  Optional<routing::Route> route = graph->getRoute(toLanelet, fromLanelet, 1, true);
-  // routing::LaneletPath shortest_path = route->shortestPath();
-  // LaneletSequence fullLane = route->fullLane(fromLanelet);
-  // assert(!shortest_path.empty());
+  Optional<routing::Route> route = graph->getRoute(fromLanelet, toLanelet);
+
   if (route) {
       LaneletSubmapConstPtr routeMap = route->laneletSubmap();
       
-      write("/home/eonsoo/Ku_ik/src/planning/global_planning/src/TOWN5.osm", *routeMap->laneletMap(), Origin({0, 0}));
+      write("/home/eonsoo/OSM File/TOWN5_4.osm", *routeMap->laneletMap(), Origin({0, 0}));
   }
   else{
     cout << "No Route" << endl;
@@ -337,3 +308,165 @@ int main(int argc, char **argv){
 
   return 0;
 }
+
+// std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
+  
+//   projection::UtmProjector projection(Origin({0, 0}));
+//   GPSPoint gps;
+  
+//   // /*****************시작 포인트 정보 입력*******************/
+
+//   // int from_address;
+//   // float from_lat;
+//   // float from_lon;
+//   // float from_utm_x, from_utm_y;
+//   // std::cout << "----------Address----------- \n"
+//   //           << " A : 71, B : 72 \n"
+//   //           << "Write from address number : ";
+//   // std::cin >> from_address;
+//   // switch (from_address)
+//   // {
+//   // case A :
+//   //   gps.lat =  -0.00167949528873; //  -0.00072758317;
+//   //   gps.lon = 0.000136853647009; // 0.0020453343;
+//   //   break;
+//   // case B :
+//   //   gps.lat = -0.00171111679; //0.00007413843;
+//   //   gps.lon = 0.00013669582; //0.00121679525;
+//   //   break;
+//   // default:
+//   //   break;
+//   // }
+ 
+//   // std::cout << "From address : " << from_address << std::endl;
+//   // std::cout << "From latitude : " << gps.lat << ", From longitude : " << gps.lon << std::endl;
+  
+//   // from_utm_x = projection.forward(gps).x();
+//   // from_utm_y = projection.forward(gps).y();
+//   // std::cout << "from_utm_x : " << from_utm_x << ", from_utm_y : " << from_utm_y << std::endl;
+//   // std::cout << "-----------------------" << std::endl;
+//   // Lanelets from_lanelets = map->laneletLayer.nearest(BasicPoint2d(from_utm_x, from_utm_y), 1);
+  
+//   // /*****************도착 포인트 정보 입력*******************/
+//   // int to_address;
+//   // float to_lat;
+//   // float to_lon; 
+//   // double to_utm_x, to_utm_y;
+//   // std::cout << "----------Address----------- \n"
+//   //           << " A : 71, B : 72 \n"
+//   //           << "Write from address number : ";
+//   // std::cin >> to_address;
+
+//   // switch (to_address)
+//   //   {
+//   //   case A :
+//   //     gps.lat =  0.00159147945; //  -0.00072758317;
+//   //     gps.lon = 0.00024134327; // 0.0020453343;
+//   //     break;
+//   //   case B :
+//   //   //   gps.lat = 0.0017011145; //0.00007413843;
+//   //   // gps.lon = 0.00017174538; //0.00121679525;
+//   //     gps.lat = 0.00011943097;
+//   //     gps.lon = 0.00088110812;
+//   //     break;
+//   //   default:
+//   //     break;
+  
+//   // }
+ 
+//   // std::cout << "To address : " << to_address << std::endl;
+//   // std::cout << "To latitude : " << gps.lat << ", To longitude : " << gps.lon << std::endl;
+  
+//   // to_utm_x = projection.forward(gps).x();
+//   // to_utm_y = projection.forward(gps).y();
+//   // std::cout << "to_utm_x : " << to_utm_x << ", to_utm_y : " << to_utm_y << std::endl;
+//   // std::cout << "-----------------------" << std::endl;
+//   // Lanelets to_lanelets = map->laneletLayer.nearest(BasicPoint2d(to_utm_x, to_utm_y), 1);
+//   // ConstLanelet fromLanelet = from_lanelets[0];
+//   // ConstLanelet toLanelet = to_lanelets[0];
+  
+//   LineString3d middleLs{map->lineStringLayer.get(16628)};
+//   LineString3d middleNextLs{map->lineStringLayer.get(10894)};
+//   Lanelet fromLanelet = map->laneletLayer.get(5094); // 16629
+//   Lanelet toLanelet = map->laneletLayer.get(17447);
+//   Lanelet nextToLanelet = map->laneletLayer.get(10895);
+//   Lanelet nextFromLanelet= map->laneletLayer.get(5797);
+//   // middleLs.attributes()[AttributeName::Type] = AttributeValueString::LineThin;
+//   // middleLs.attributes()[AttributeName::Subtype] = AttributeValueString::Dashed;
+  
+//   // middleLs.attributes()[AttributeName::Type] = AttributeValueString::LineThin;
+//   // middleLs.attributes()[AttributeName::Subtype] = AttributeValueString::Dashed;
+  
+//   // toLanelet.attributes()[AttributeName::Type] = AttributeValueString::Lanelet;
+//   // toLanelet.attributes()[AttributeName::Subtype] = AttributeValueString::Road;
+//   // toLanelet.attributes()[AttributeName::Location] = AttributeValueString::Urban;
+//   // toLanelet.attributes()[AttributeName::OneWay] = true;
+//   // fromLanelet.attributes() = toLanelet.attributes();
+//   // nextFromLanelet.attributes() = toLanelet.attributes();
+//   // nextToLanelet.attributes() = toLanelet.attributes();
+
+//   // std::cout << "Middle Line : " << middleLs.attributes() << std::endl;
+//   std::cout << "toLanelet : " << toLanelet.attributes() << std::endl;
+//   std::cout << "fromLanelet : " << fromLanelet.attributes() << std::endl;
+//   std::cout << "nextFromLanelet : " << nextFromLanelet.attributes() << std::endl;
+//   std::cout << "nextToLanelet : " << nextToLanelet.attributes() << std::endl;
+
+
+
+//   // assert(trafficRules->canChangeLane(fromLanelet, toLanelet));
+
+//   // Lanelets lanelets{toLanelet, fromLanelet, nextFromLanelet, nextToLanelet};
+//   // LaneletMapUPtr laneletsMap = utils::createMap(lanelets);
+  
+//   //  write("/home/eonsoo/Ku_ik/src/planning/global_planning/src/TOWN5.osm", *laneletsMap, Origin({0, 0}));
+//   // // cout << fromLanelet.leftBound().id() << endl;
+//   // cout << toLanelet.leftBound().id() << endl;
+//   // Optional<routing::LaneletPath> shortestPath = graph->shortestPath(fromLanelet, toLanelet, 1, true);
+//   Optional<routing::LaneletPath> shortestPath = graph->shortestPath(fromLanelet, nextFromLanelet);
+//   // assert(shortestPath.has_value());
+//   // GlobalPlanning 클래스 정의 내부에
+//   std::vector<BasicPoint2d> centerlinePoints;
+//   std::vector<BasicPoint2d> leftlinePoints;
+//   std::vector<BasicPoint2d> rightlinePoints;
+  
+//   LaneletMap laneletMap;
+
+//   // CreateRoutingGraphs 메서드 내부에서, 최단 경로를 얻은 후에
+//   if (shortestPath) {
+//       centerlinePoints.clear(); // 새로운 점들을 추가하기 전에 기존의 점들을 초기화합니다.
+//       // 최단 경로의 각 lanelet을 순회합니다
+//       for (const auto& lanelet : *shortestPath) {
+//           // 현재 lanelet의 중앙선을 가져옵니다
+//           auto centerline = lanelet.centerline();    
+//           auto leftline = lanelet.leftBound();
+//           auto rightline = lanelet.rightBound(); 
+//           // 중앙선의 각 점을 벡터에 추가합니다
+//           for (const auto& point : centerline) {
+//             centerlinePoints.push_back(point.basicPoint2d());
+//           }
+//           for (const auto& point : leftline) {
+//             leftlinePoints.push_back(point.basicPoint2d());
+//           }
+//           for (const auto& point : rightline) {
+//             rightlinePoints.push_back(point.basicPoint2d());
+//           }
+//       } 
+//   }
+
+//   VisualizeLeftLine(leftlinePoints);
+//   VisualizeRightLine(rightlinePoints);
+
+//   Optional<routing::Route> route = graph->getRoute(fromLanelet, nextFromLanelet, 1, true);
+//   // routing::LaneletPath shortest_path = route->shortestPath();
+//   // LaneletSequence fullLane = route->fullLane(fromLanelet);
+//   // assert(!shortest_path.empty());
+//   if (route) {
+//       LaneletSubmapConstPtr routeMap = route->laneletSubmap();
+      
+//       write("/home/eonsoo/OSM File/TOWN5_3.osm", *routeMap->laneletMap(), Origin({0, 0}));
+//   }
+//   else{
+//     cout << "No Route" << endl;
+//   }
+//   return centerlinePoints;
+// }

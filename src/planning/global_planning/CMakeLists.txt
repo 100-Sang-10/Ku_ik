@@ -139,9 +139,9 @@ find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
 
-add_executable(global_node src/global_planning_node.cpp)
-add_dependencies(global_node  ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(global_node ${catkin_LIBRARIES})
+add_executable(Global_planning_node src/global_planning_node.cpp)
+add_dependencies(Global_planning_node  ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(Global_planning_node ${catkin_LIBRARIES})
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

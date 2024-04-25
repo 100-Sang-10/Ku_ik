@@ -74,43 +74,62 @@ class GlobalPlanning{
     BasicPoint2d m_utm_point;
     Lanelet m_spawn_lanelet; 
     Lanelet m_prev_from_lanelet;
-    vector<BasicPoint2d> m_center_line_points;
-    vector<BasicPoint2d> m_right_line_points;
+
+    vector<double> m_paths_dist;
     bool m_gnss_bool;
     bool m_init_bool;
 
     Dst m_address1;
     Dst m_address2;
     Dst m_address3;
-    int add = 71;
+
+    Dst m_candidate_path1;
+    Dst m_candidate_path2;
+    Dst m_candidate_path3;
+    Dst m_candidate_path4;
+    Dst m_candidate_path5;
+    Dst m_candidate_path6;
+  
 
   public:
     GlobalPlanning(){
-      left_marker_pub = nh.advertise<visualization_msgs::Marker>("left_marker", 10);
-      center_marker_pub = nh.advertise<visualization_msgs::MarkerArray>("center_marker", 10);
-      right_marker_pub = nh.advertise<visualization_msgs::Marker>("right_marker", 10);
+      
+      center_marker_pub = nh.advertise<visualization_msgs::Marker>("center_marker", 10);
+      // center_marker_pub = nh.advertise<visualization_msgs::MarkerArray>("center_marker", 10);
       center_line_pub = nh.advertise<geometry_msgs::PoseArray>("center_line_point", 10);
       vehicle_gnss_sub = nh.subscribe("/carla/ego_vehicle/gnss", 100, &GlobalPlanning::GNSSCallback, this);
       m_gnss_bool = false;
       m_init_bool = false;
-      m_center_line_points.clear(); // vector 초기화합니다.
+      
+      m_candidate_path1.points.clear();
+      m_candidate_path2.points.clear();
+      m_candidate_path3.points.clear();
+      m_candidate_path4.points.clear();
+      m_candidate_path5.points.clear();
+      m_candidate_path6.points.clear();
 
       map = load("../Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
       graph = routing::RoutingGraph::build(*map, *trafficRules);
     };
     ~GlobalPlanning(){};
-    double CreateRoutingGraphs(Lanelet& from_lanelet, Lanelet& to_lanelet);
+    void GNSSCallback(const sensor_msgs::NavSatFix::ConstPtr& gnss_msg);
+    void FindSpawnPoint();
+    void CalculatePath();
     void GetLanelet(Dst& to_address);
     bool GetDestination(Dst& m_address1, Dst& m_address2, Dst& m_address3);
-    void CalcutatePath();
-    void FindSpawnPoint();
-    void CompareAddresses(std::map<string, double>& addresses);
+    void CalculateShortPath(Dst& candidate_path,
+                            Lanelet& spawn_lanelet, 
+                            Lanelet& lanelet1, 
+                            Lanelet& lanelet2, 
+                            Lanelet& lanelet3);
+
+    void CreateRoutingGraphs(Dst& candidate_path, Lanelet& from_lanelet, Lanelet& to_lanelet);
+    void CompareAddresses(double total_dist);
+    
+    void VisualizeCenterLine(const vector<BasicPoint2d>& path_points);
+
     bool getGNSS();
-    void GNSSCallback(const sensor_msgs::NavSatFix::ConstPtr& gnss_msg);
-    void VisualizeLeftLine(const vector<BasicPoint2d>& leftlinePoints);
-    void VisualizeCenterLine(const vector<BasicPoint2d>& m_center_line_points);
-    void VisualizeRightLine(const vector<BasicPoint2d>& m_right_line_points);
 
 };
 
@@ -124,7 +143,7 @@ void GlobalPlanning::GNSSCallback(const sensor_msgs::NavSatFix::ConstPtr& gnss_m
     m_gnss_bool = true;
   }
   if(m_gnss_bool){
-    CalcutatePath();
+    CalculatePath();
   }
 }
 
@@ -146,8 +165,8 @@ void GlobalPlanning::FindSpawnPoint(){
 
   cout << "X : " << m_utm_point.x() << ", Y : " << m_utm_point.y() << endl;
 
-  //spawn 1(우측 하단).188.886138916, -91.5933456421 270
-  //spawn 2(좌측 상단).-138.765396118 186.384170532 0
+  //spawn 1(우측 하단).188.886138916, -91.5933456421 0.0 270
+  //spawn 2(좌측 상단).-138.765396118 186.384170532 15.0 0
   Point2d point{utils::getId(), m_utm_point.x(), m_utm_point.y()}; 
   auto nearlane_start = geometry::findWithin2d(map->laneletLayer,point, (1.75, 1.75));
   m_spawn_lanelet  = map->laneletLayer.get(nearlane_start.operator[](0).second.id());
@@ -161,6 +180,7 @@ bool GlobalPlanning::GetDestination(Dst& m_address1, Dst& m_address2, Dst& m_add
   /*****************도착 포인트 정보 입력*******************/
   int to_address;
   string input;
+  cout << " " << endl;
   cout << "----------Destination----------- \n"
             << " A : 71, B : 72, C : 73, D : 74 \n"
             << "Write Destination address number : ";
@@ -182,7 +202,7 @@ bool GlobalPlanning::GetDestination(Dst& m_address1, Dst& m_address2, Dst& m_add
  
 }
 
-void GlobalPlanning::CalcutatePath(){
+void GlobalPlanning::CalculatePath(){
  
   while(!GetDestination(m_address1, m_address2, m_address3)){
 
@@ -191,13 +211,70 @@ void GlobalPlanning::CalcutatePath(){
   GetLanelet(m_address1);
   GetLanelet(m_address2);
   GetLanelet(m_address3);
-  
-  CreateRoutingGraphs(m_spawn_lanelet, m_address1.lanelet);
-  CreateRoutingGraphs(m_address1.lanelet, m_address2.lanelet);
-  CreateRoutingGraphs(m_address2.lanelet, m_address3.lanelet);
+  cout << " " << endl;
+  cout <<"--------------------------------" << endl;
+  CalculateShortPath(m_candidate_path1, m_spawn_lanelet, m_address1.lanelet, m_address2.lanelet, m_address3.lanelet); // 1 - 2 - 3
+  cout << "Candidate path 1 check" << endl;
+  CalculateShortPath(m_candidate_path2, m_spawn_lanelet, m_address1.lanelet, m_address3.lanelet, m_address2.lanelet); // 1 - 3 - 2
+  cout << "Candidate path 2 check" << endl;
+  CalculateShortPath(m_candidate_path3, m_spawn_lanelet, m_address2.lanelet, m_address1.lanelet, m_address3.lanelet); // 2 - 1 - 3
+  cout << "Candidate path 3 check" << endl;
+  CalculateShortPath(m_candidate_path4, m_spawn_lanelet, m_address2.lanelet, m_address3.lanelet, m_address1.lanelet); // 2 - 3 - 1
+  cout << "Candidate path 4 check" << endl;
+  CalculateShortPath(m_candidate_path5, m_spawn_lanelet, m_address3.lanelet, m_address1.lanelet, m_address2.lanelet); // 3 - 1 - 2
+  cout << "Candidate path 5 check" << endl;
+  CalculateShortPath(m_candidate_path6, m_spawn_lanelet, m_address3.lanelet, m_address2.lanelet, m_address1.lanelet); // 3 - 2 - 1
+  cout << "Candidate path 6 check" << endl;
 
-  VisualizeCenterLine(m_center_line_points);
-  VisualizeRightLine(m_right_line_points);
+  double min_value = numeric_limits<double>::max();
+  int path_number = 0;
+  
+  for(int i = 0 ; i < m_paths_dist.size() ; i++){
+    cout << "Candidate Path [" << i+1 << "] : "<< m_paths_dist[i] << endl;
+    if(m_paths_dist[i] < min_value){
+      min_value = m_paths_dist[i];
+      path_number = i + 1;
+    }
+  } 
+  m_paths_dist.clear();
+  cout <<"  " << endl;
+  switch (path_number)
+  {
+    case 1 :
+      cout << "----------Route Direction----------- " << endl;
+      cout <<  "1 - 2 - 3" << endl;
+      VisualizeCenterLine(m_candidate_path1.points);
+      break;
+    case 2 :
+      cout << "----------Route Direction----------- " << endl;
+      cout <<  "1 - 3 - 2" << endl;
+      VisualizeCenterLine(m_candidate_path2.points);
+      break;
+    case 3 :
+      cout << "----------Route Direction----------- " << endl;
+      cout <<  "2 - 1 - 3" << endl;  
+      VisualizeCenterLine(m_candidate_path3.points);
+      break;
+    case 4 :
+      cout << "----------Route Direction----------- " << endl;
+      cout <<  "2 - 3 - 1" << endl;  
+      VisualizeCenterLine(m_candidate_path4.points);
+      break;
+    case 5 :
+      cout << "----------Route Direction----------- " << endl;
+      cout <<  "3 - 1 - 2" << endl;  
+      VisualizeCenterLine(m_candidate_path5.points);
+      break;
+    case 6 :
+      cout << "----------Route Direction----------- " << endl;
+      cout <<  "3 - 2 - 1" << endl; 
+      VisualizeCenterLine(m_candidate_path6.points);
+      break;      
+    default:
+      break;
+
+  }
+  
 }
 
 void GlobalPlanning::GetLanelet(Dst& to_address){
@@ -208,13 +285,13 @@ void GlobalPlanning::GetLanelet(Dst& to_address){
   switch (to_address.number)
     {
     case A :
-      to_address.lanelet = map->laneletLayer.get(21496);    //B
+      to_address.lanelet = map->laneletLayer.get(649);   //A
       break;
     case B :
-      to_address.lanelet = map->laneletLayer.get(5797);  //C
+      to_address.lanelet = map->laneletLayer.get(21496); //B
       break;
     case C :
-      to_address.lanelet = map->laneletLayer.get(649);   //A
+      to_address.lanelet = map->laneletLayer.get(5797);  //C
       break;
     case D :
       to_address.lanelet = map->laneletLayer.get(722);  //D
@@ -225,9 +302,23 @@ void GlobalPlanning::GetLanelet(Dst& to_address){
   }
 }
 
+void GlobalPlanning::CalculateShortPath(Dst& candidate_path, 
+                                        Lanelet& spawn_lanelet, 
+                                        Lanelet& lanelet1, 
+                                        Lanelet& lanelet2, 
+                                        Lanelet& lanelet3){
+  // m_prev_from_lanelet.setId(999999);
+  CreateRoutingGraphs(candidate_path, spawn_lanelet, lanelet1);
+  CreateRoutingGraphs(candidate_path, lanelet1, lanelet2);
+  CreateRoutingGraphs(candidate_path, lanelet2, lanelet3);
+  // cout << "Debugging" << endl;
+  m_paths_dist.push_back(candidate_path.sum_distance);
 
-double GlobalPlanning::CreateRoutingGraphs(Lanelet& from_lanelet, Lanelet& to_lanelet) {
+}
 
+
+void GlobalPlanning::CreateRoutingGraphs(Dst& candidate_path, Lanelet& from_lanelet, Lanelet& to_lanelet) {
+  
   Optional<routing::LaneletPath> shortestPath = graph->shortestPath(from_lanelet, to_lanelet);
   if (shortestPath) {
     
@@ -235,15 +326,17 @@ double GlobalPlanning::CreateRoutingGraphs(Lanelet& from_lanelet, Lanelet& to_la
     BasicPoint2d last_point = m_utm_point;
     bool point_check;    
     double sum_dist = 0;
-
+    
     for (const auto& lanelet : *shortestPath) {
       point_check = false;
       // 현재 lanelet의 중앙선을 가져옵니다
       auto centerline = lanelet.centerline();    
-      auto rightline = lanelet.rightBound();
+
       BasicPoint2d prev_point;
       // 중앙선의 각 점을 벡터에 추가합니다
-      if(m_prev_from_lanelet.id() != lanelet.id()){
+      // cout << "prev lanelet id :" <<m_prev_from_lanelet.id() << endl;
+      // cout << "current lanelet id : " << lanelet.id() << endl;
+      // if(m_prev_from_lanelet.id() != lanelet.id()){
         for (auto& point : centerline) {
           double distance_x = abs((point.x() - last_point.x()));
           double distance_y = abs((point.y() - last_point.y()));
@@ -253,7 +346,7 @@ double GlobalPlanning::CreateRoutingGraphs(Lanelet& from_lanelet, Lanelet& to_la
         
           }
           if(point_check){
-              m_center_line_points.push_back(point.basicPoint2d());
+              candidate_path.points.push_back(point.basicPoint2d());
               double distance = sqrt(pow((point.x()- prev_point.x()), 2) + pow((point.y()- prev_point.y()), 2));
               sum_dist += distance;
               prev_point = point.basicPoint2d();
@@ -262,125 +355,120 @@ double GlobalPlanning::CreateRoutingGraphs(Lanelet& from_lanelet, Lanelet& to_la
         }
         last_point = centerline[centerline.size()-1].basicPoint2d(); // 각 레인렛의 마지막 점 저장
 
-        for (const auto& point : rightline) {
-          m_right_line_points.push_back(point.basicPoint2d());
-        }
-
-      }
-      else{
-        cout << "Same Lanelet : " << m_prev_from_lanelet.id() <<"," << lanelet.id() << endl;
-      }
+      // }
+      // else{
+        // cout << "Same Lanelet : " << m_prev_from_lanelet.id() <<"," << lanelet.id() << endl;
+      // }
         
     }
-    
+    candidate_path.sum_distance += sum_dist;
   }
   else{
     cout << "No Path" << endl;
   }
-  m_prev_from_lanelet = from_lanelet;
+ 
+  m_prev_from_lanelet = to_lanelet;
 
-  Optional<routing::Route> route = graph->getRoute(m_address2.lanelet, m_address3.lanelet);
-  if (route) {
-      LaneletSubmapConstPtr routeMap = route->laneletSubmap();
+  // Optional<routing::Route> route = graph->getRoute(m_address2.lanelet, m_address3.lanelet);
+  // if (route) {
+  //     LaneletSubmapConstPtr routeMap = route->laneletSubmap();
       
-      write("/home/eonsoo/OSM File/TOWN5_4.osm", *routeMap->laneletMap(), Origin({0, 0}));
-  }
-  else{
-    cout << "No Route" << endl;
-  }
+  //     write("/home/eonsoo/OSM File/TOWN5_4.osm", *routeMap->laneletMap(), Origin({0, 0}));
+  // }`
+  // else{
+  //   cout << "No Route" << endl;
+  // }
 
 }
 
-
-void GlobalPlanning::CompareAddresses(std::map<string, double>& addresses) {
-  string minKey;
-  double minValue = numeric_limits<double>::max(); // 최솟값 초기화
-
-  // 딕셔너리 순회
-  for (const auto& pair : addresses) {
-      if (pair.second < minValue) {
-          minValue = pair.second;
-          minKey = pair.first;
-      }
-  }
-
-  // 가장 작은 값을 가진 키를 딕셔너리에서 삭제
-  addresses.erase(minKey);
-}
-
-
-void GlobalPlanning::VisualizeCenterLine(const vector<BasicPoint2d>& m_center_line_points){
+void GlobalPlanning::VisualizeCenterLine(const vector<BasicPoint2d>& path_points){
 
      // 메시지 초기화
     visualization_msgs::Marker marker;
     marker.header.frame_id = "map"; // RViz에서 표시할 프레임
     marker.header.stamp = ros::Time::now();
     marker.ns = "centerline";
-    marker.type = visualization_msgs::Marker::CUBE;
+    marker.id = 0;
+    marker.type = visualization_msgs::Marker::LINE_STRIP;
     marker.action = visualization_msgs::Marker::ADD;
-    marker.scale.x = 0.2; // 선의 두께
-    marker.scale.y = 0.2; // 선의 두께
-    marker.scale.z = 0.2; // 선의 두께
+    marker.scale.x = 0.1; // 선의 두께
+
     // 선 색상 설정 (R, G, B, A)
-    marker.color.r = 0.5;
-    marker.color.g = 1.0;
+    marker.color.r = 1.0;
+    marker.color.g = 0.0;
     marker.color.b = 0.0;
     marker.color.a = 1.0;
     marker.pose.orientation.w = 1.0 ;
     // 중앙선의 점들을 메시지에 추가
-    int count = 0;
     geometry_msgs::PoseArray center_points;
-
-    for (const auto& point : m_center_line_points) {
+    int count = 0;
+    for (const auto& point : path_points) {
         geometry_msgs::Point p;
         geometry_msgs::Pose c;
-        marker.id = count;
+        
         p.x = point.x();
         p.y = point.y();
         p.z = 0.0; // 2D 중앙선이므로 z 값은 0
         
         c.position = p;
-        marker.pose.position = p;
         
         center_points.poses.push_back(c);
-        center_array.markers.push_back(marker);
-        count++;
+        marker.points.push_back(p);
+        count ++;
     }
     
-    //Control pub
     center_line_pub.publish(center_points);
 
     // 메시지 게시
-    center_marker_pub.publish(center_array);
+    center_marker_pub.publish(marker);
 }
 
-void GlobalPlanning::VisualizeRightLine(const vector<BasicPoint2d>& m_right_line_points){
+// void GlobalPlanning::VisualizeCenterLine(const vector<BasicPoint2d>& path_points){
 
-    // 메시지 초기화
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = "map"; // RViz에서 표시할 프레임
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "rightline";
-    marker.id = 0;
-    marker.type = visualization_msgs::Marker::LINE_STRIP;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.scale.x = 0.1; // 선의 두께
-    marker.pose.orientation.w = 1.0 ;
-    // 선 색상 설정 (R, G, B, A)
-    marker.color.r = 0.1;
-    marker.color.g = 0.3;
-    marker.color.b = 0.7;
-    marker.color.a = 1.0;
+//      // 메시지 초기화
+//     center_array.markers.clear();
+//     visualization_msgs::Marker marker;
+//     marker.header.frame_id = "map"; // RViz에서 표시할 프레임
+//     marker.header.stamp = ros::Time::now();
+//     marker.ns = "centerline";
+//     marker.type = visualization_msgs::Marker::CUBE;
+//     marker.action = visualization_msgs::Marker::ADD;
+//     marker.scale.x = 0.2; // 선의 두께
+//     marker.scale.y = 0.2; // 선의 두께
+//     marker.scale.z = 0.2; // 선의 두께
+//     // 선 색상 설정 (R, G, B, A)
+//     marker.color.r = 0.5;
+//     marker.color.g = 1.0;
+//     marker.color.b = 0.0;
+//     marker.color.a = 1.0;
+//     marker.pose.orientation.w = 1.0 ;
+//     // 중앙선의 점들을 메시지에 추가
+//     int count = 0;
+//     geometry_msgs::PoseArray center_points;
 
-    // 중앙선의 점들을 메시지에 추가
-    for (const auto& point : m_right_line_points) {
-        geometry_msgs::Point p;
-        p.x = point.x();
-        p.y = point.y();
-        p.z = 0.0; // 2D 중앙선이므로 z 값은 0
-        marker.points.push_back(p);
-    }
-}
+//     for (const auto& point : path_points) {
+//         geometry_msgs::Point p;
+//         geometry_msgs::Pose c;
+//         marker.id = count;
+//         p.x = point.x();
+//         p.y = point.y();
+//         p.z = 0.0; // 2D 중앙선이므로 z 값은 0
+        
+//         c.position = p;
+//         marker.pose.position = p;
+        
+//         center_points.poses.push_back(c);
+//         center_array.markers.push_back(marker);
+//         count++;
+//     }
+
+//     //Control pub
+//     center_line_pub.publish(center_points);
+
+//     // 메시지 게시
+//     center_marker_pub.publish(center_array);
+// }
+
 int main(int argc, char **argv){
 
   ros::init(argc, argv, "Global_planning_node");

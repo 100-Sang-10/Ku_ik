@@ -11,6 +11,8 @@ PointControl::PointControl() {
     purepursuit_point_pub = nh.advertise<visualization_msgs::Marker>("/purepursuit_point_marker", 100);
     sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
     sliding_window_error_pub = nh.advertise<std_msgs::Float32>("/sliding_window_error",100);
+
+    
 }
 
 std::vector<double> PointControl::WGS84toCartesian(double input_lat, double input_long) {

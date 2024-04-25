@@ -57,7 +57,8 @@ class GlobalPlanning{
       right_marker_pub = nh.advertise<visualization_msgs::Marker>("right_marker", 10);
       center_line_pub = nh.advertise<geometry_msgs::PoseArray>("center_line_point", 10);
 
-      map = load("/home/eonsoo/Ku_ik/src/planning/global_planning/src/Town05.osm",  projection::UtmProjector(Origin({0, 0})));
+      // map = load("/home/eonsoo/Ku_ik/src/planning/global_planning/src/Town05.osm",  projection::UtmProjector(Origin({0, 0})));
+      map = load("../Ku_ik/src/planning/global_planning/src/Town05.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
       graph = routing::RoutingGraph::build(*map, *trafficRules);
     };
@@ -206,7 +207,7 @@ std::vector<BasicPoint2d> GlobalPlanning::CreateRoutingGraphs() {
   if (route) {
       LaneletSubmapConstPtr routeMap = route->laneletSubmap();
       
-      write("/home/eonsoo/Ku_ik/src/planning/global_planning/src/TOWN5.osm", *routeMap->laneletMap(), Origin({0, 0}));
+      write("../Ku_ik/src/planning/global_planning/src/TOWN5.osm", *routeMap->laneletMap(), Origin({0, 0}));
   }
   else{
     cout << "No Route" << endl;

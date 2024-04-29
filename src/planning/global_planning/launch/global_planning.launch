@@ -1,0 +1,7 @@
+<launch>
+
+    <node pkg="global_planning" type="Global_planning_node" name="Global_planning_node"  output="screen">
+  </node>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find global_planning)/config/global_planning.rviz" />
+</launch>

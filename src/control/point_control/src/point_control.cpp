@@ -12,7 +12,43 @@ PointControl::PointControl() {
     sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
     sliding_window_error_pub = nh.advertise<std_msgs::Float32>("/sliding_window_error",100);
 
-    
+    center_marker_sub = nh.subscribe("/center_line_point", 100, &PointControl::OsmCallback, this);
+}
+
+void PointControl::OsmCallback(const geometry_msgs::PoseArray::ConstPtr& center_line_msg){
+    center_points = *center_line_msg;
+    // int num = center_points.poses.size();
+    // for(int i = 0; i < num; i++) {
+    //     geometry_msgs::Pose c;
+    //     geometry_msgs::Point p;
+    //     c = center_points.poses[i];
+    //     p = c.position;
+    //     double x = p.x;
+    //     double y = p.y;
+    //     ROS_INFO("x = %f, y = %f", x, y);
+    // }
+}
+
+void PointControl::ReadCenterLine() {
+    int num = center_points.poses.size();
+    // ROS_INFO("num = %i", num);
+    if (num != 0) {
+        global_planning = true;
+        if (!waypoint_stop) {
+            for(int i = 0; i < num; i++) {
+                geometry_msgs::Pose c;
+                geometry_msgs::Point p;
+                std::vector<double> map_XY;
+                c = center_points.poses[i];
+                p = c.position;
+                map_XY.push_back(p.x);
+                map_XY.push_back(p.y);
+                // ROS_INFO("x = %f, y = %f", map_XY[0], map_XY[1]);
+                waypoint_vec.push_back(map_XY);
+            }
+            waypoint_stop = true;
+        }
+    }
 }
 
 std::vector<double> PointControl::WGS84toCartesian(double input_lat, double input_long) {
@@ -23,8 +59,8 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
     XY.push_back(cartesian_position[0]);
     XY.push_back(cartesian_position[1]);
     
-    ROS_INFO("x = %f", cartesian_position[0]);
-    ROS_INFO("y = %f", cartesian_position[1]);
+    // ROS_INFO("x = %f", cartesian_position[0]);
+    // ROS_INFO("y = %f", cartesian_position[1]);
     
     return XY;
 }
@@ -134,8 +170,9 @@ void PointControl::odom_Callback(const nav_msgs::Odometry::ConstPtr& odom_msg) {
     // ROS_INFO("waypoint coordinate from vehicle ");
     // ROS_INFO("target.x: %f", co_tf_x);
     // ROS_INFO("target.y: %f \n", co_tf_y);
-
-    pure_pursuit();
+    if (global_planning) {
+        pure_pursuit();
+    }
 
     // ROS_INFO("contorl vehicle ");    
     // ROS_INFO("throttle = %f", accelerator);
@@ -157,53 +194,49 @@ double PointControl::cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg) {
     return yaw;
 }
 
-void PointControl::coordinate_tf() {
-    double current_point_x, current_point_y, x, y, a, d;
-    double ld = 5.0;  //look ahead distance
+std::pair<double, double> PointControl::coordinate_tf(double input_x, double input_y) {
+    double x, y, a, d, output_x, output_y;
 
-    current_point_x = next_point_x;
-    current_point_y = next_point_y;
-    x = current_point_x - ego_vehicle_x;
-    y = current_point_y - ego_vehicle_y;
+    x = input_x - ego_vehicle_x;
+    y = input_y - ego_vehicle_y;
     a = atan2(y, x) - ego_yaw;
     d = sqrt( pow(x, 2) + pow(y, 2) );
     
-    co_tf_x = d * cos(a) + 1.206373665536404;  //뒷바퀴 기준
-    co_tf_y = d * sin(a);
+    output_x = d * cos(a);
+    output_y = d * sin(a);
 
-    if (d <= ld) {
-        next_point();
-    }
+    return std::make_pair(output_x, output_y);
 }
 
 void PointControl::next_point() {
-    std::vector<double> waypoint;
+    int count = 0;
     
-    std::vector<std::vector<double>>::iterator itr = waypoint_vec.begin() + waypoint_count;
-    waypoint = *itr;
+    std::vector<double> waypoint;
 
-    next_point_x = waypoint[0];
-    next_point_y = waypoint[1];
+    for(std::vector<std::vector<double>>::iterator itr = waypoint_vec.begin(); itr != waypoint_vec.end(); ++itr) {
+        if(count == purepursuit_waypoint_count){
+            break;
+        }
 
-    waypoint_count++;
+        waypoint = *itr;
 
+        next_point_x = waypoint[0];
+        next_point_y = waypoint[1];
 
-    // ROS_INFO("next_point");
+        count++;
+    }
+
+    purepursuit_waypoint_count++;
 }
 
 void PointControl::pure_pursuit(){
-    
+    waypoint_angle = - atan2( 2 * purepursuit_current_co_tf_y * wheelbase, pow(purepursuit_d, 2) ) * (2 / M_PI);  // steering: -1.0 ~ 1.0
+    // waypoint_angle *= 1.221730351448059;                                                              // steering ratio
 
+    double mid_d;
     calc_midpoint();
-    coordinate_tf();
-
-    double L, waypoint_d, mid_d;
-    L = 2.66503413435;  //wheelbase
-    waypoint_d = sqrt( pow(co_tf_x, 2) + pow(co_tf_y, 2) );  //target distance from 뒷바퀴
-    waypoint_angle = - atan2( 2 * co_tf_y * L, pow(waypoint_d, 2) ) * (2 / M_PI);
-
     mid_d = sqrt( pow(mid_co_tf_x, 2) + pow(mid_co_tf_y, 2) );  //target distance from 뒷바퀴
-    mid_angle = - atan2( 2 * mid_co_tf_y * L, pow(mid_d, 2) ) * (2 / M_PI);
+    mid_angle = - atan2( 2 * mid_co_tf_y * wheelbase, pow(mid_d, 2) ) * (2 / M_PI);
 
     if (following_state == 21) {
         angle = mid_angle;
@@ -217,6 +250,36 @@ void PointControl::pure_pursuit(){
     // ROS_INFO("next_point_x = %f", next_point_x);
     // ROS_INFO("next_point_y = %f", next_point_y);
     // ROS_INFO("-----------------------------------\n");
+
+    if (angle >= 1.0) {
+        angle = 1.0;
+    }
+    else if (angle <= -1.0) {
+        angle = -1.0;
+    }
+}
+
+void PointControl::purepursuit_next_point(){
+    wheelbase = 2.66503413435;     // wheelbase
+    // Ld = -1.0 + (0.125 * current_speed);  // look ahead distance
+    Ld = 5.0;
+    if (Ld <= 2.0) {
+        Ld = 2.0;
+    }
+
+    while(1) {
+        std::pair<double, double> p = coordinate_tf(next_point_x, next_point_y);
+        purepursuit_current_co_tf_x = p.first;
+        purepursuit_current_co_tf_y = p.second;
+        purepursuit_current_co_tf_x += 1.206373665536404;                                                 // from rear wheel
+        purepursuit_d = sqrt( pow(purepursuit_current_co_tf_x, 2) + pow(purepursuit_current_co_tf_y, 2) );  // target distance from rear wheel
+        if (purepursuit_d <= Ld) {
+            next_point();
+        }
+        else {
+            break;
+        }
+    }
 }
 
 void PointControl::speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg) {
@@ -224,7 +287,7 @@ void PointControl::speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg) 
 }
 
 void PointControl::PID(const std_msgs::Float32::ConstPtr& speed_msg){
-    double p, i, d, Kp, Ki, Kd, target_speed, current_speed, error, previous_error, delta_error, error_integral, error_derivative;
+    double p, i, d, Kp, Ki, Kd, target_speed, error, previous_error, delta_error, error_integral, error_derivative;
 
     Kp = 0.7;
     Ki = 0.15;
@@ -269,8 +332,9 @@ void PointControl::control() {
     move.reverse = false;
     move.gear = 1;                    // D = 1,  N = 0,  R = -1
     move.manual_gear_shift = false;
-
-    control_pub.publish(move);
+    if (global_planning) {
+        control_pub.publish(move);
+    }
 }
 
 void PointControl::point_Callback(const geometry_msgs::PoseArray::ConstPtr& line_msg) {
@@ -394,6 +458,10 @@ void PointControl::calc_sliding_window_error() {
     sliding_window_error_pub.publish(sliding_window_error_msg);
 }
 
+void PointControl::Print() {
+    ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
+}
+
 void PointControl::publish() {
     visualize_waypoint();
     mid_point_marker();
@@ -401,14 +469,28 @@ void PointControl::publish() {
     calc_sliding_window_error();
 }
 
+void PointControl::Run() {
+    if (!waypoint_stop) {
+        ReadCenterLine();
+    }
+    if (global_planning) {
+        // pure_pursuit();
+
+        purepursuit_next_point();
+        publish();
+    }
+    Print();
+}
+
 int main( int argc, char** argv ) {
     ros::init(argc, argv, "point_control");
     PointControl point_control;
-    point_control.waypoint();
+    // point_control.waypoint();
+    // point_control.ReadCenterLine();
     ros::Rate loop_rate(30);  //1초에 30번
 
     while(ros::ok()) {
-        point_control.publish();
+        point_control.Run();
         point_control.control();
         ros::spinOnce();
         loop_rate.sleep();

@@ -19,8 +19,10 @@
 
 #define SPEED  30
 #define sliding_window_dis 5.0
-#define init_position_x -54.9099540710449
-#define init_position_y 77.2210540771484;
+#define init_position_x -138.765396118
+#define init_position_y 186.384170532
+// #define init_position_x 188.886138916
+// #define init_position_y -91.5933456421
 
 class PointControl {
   private:
@@ -40,7 +42,7 @@ class PointControl {
     std::array<double, 2> WSG84Reference{0, 0};
     ros::Subscriber sub_midpoint;
     geometry_msgs::PoseArray midpoint;
-    int following_state = 0;
+    int following_state = 20;
     ros::Publisher point_pub;
     visualization_msgs::Marker line_mid_point;
     ros::Publisher purepursuit_point_pub;
@@ -61,8 +63,20 @@ class PointControl {
     ros::Publisher crosstrack_error_pub;     // cross track error
     std_msgs::Float32 crosstrack_error_msg;  // cross track error
 
+    ros::Subscriber center_marker_sub;
+    geometry_msgs::PoseArray center_points;
+    bool global_planning = false;
+    bool waypoint_stop = false;
+
+    double current_speed;                              // speedometer
+    int purepursuit_waypoint_count = 0;
+    double Ld, wheelbase, purepursuit_d;
+    double purepursuit_current_co_tf_x, purepursuit_current_co_tf_y;
+
   public:
     PointControl();
+    void OsmCallback(const geometry_msgs::PoseArray::ConstPtr& center_line_msg);
+    void ReadCenterLine();
     std::vector<double> WGS84toCartesian(double input_lat, double input_long);  // (latitude, longitude) to (x, y)
     void waypoint();  //waypoint 담은 vector 함수
     std::vector<std::string> divide(std::string xy_str, char divider);  //벡터에 저장된 문자열 x,y 나눠주는 함수
@@ -70,9 +84,10 @@ class PointControl {
     void visualize_waypoint();  //waypoint marker 띄우는 함수
     void odom_Callback(const nav_msgs::Odometry::ConstPtr& odom_msg);  //현재 좌표와 타겟좌표
     double cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg);  //yaw값 구하는 함수
-    void coordinate_tf();  //좌표 변환 함수
-    void next_point();  //다음 waypoint 
+    std::pair<double, double> coordinate_tf(double input_x, double input_y);    // transform coordinate from vehicle
+    void next_point();
     void pure_pursuit();
+    void purepursuit_next_point();
     void speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg);  //현재 속도
     void PID(const std_msgs::Float32::ConstPtr& speed_msg);
     void control();
@@ -86,5 +101,7 @@ class PointControl {
     void calc_sliding_window_error();
     void lateral_error();
 
+    void Print();
     void publish();
+    void Run();
 };

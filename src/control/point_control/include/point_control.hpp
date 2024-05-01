@@ -16,13 +16,25 @@
 #include <geometry_msgs/PoseArray.h>
 #include <std_msgs/Int64.h>
 #include <WGS84toCartesian.hpp>
+#include <armadillo>
 
-#define SPEED  30
+#define SPEED_KPH  30
 #define sliding_window_dis 5.0
-#define init_position_x -138.765396118
-#define init_position_y 186.384170532
-// #define init_position_x 188.886138916
-// #define init_position_y -91.5933456421
+#define init_position_x -138.765396118  // not_waypoint_test
+#define init_position_y 186.384170532  // not_waypoint_test
+// #define init_position_x 188.886138916  // not_waypoint_test
+// #define init_position_y -91.5933456421  // not_waypoint_test
+// #define init_position_x -54.9099540710449  // waypoint_test
+// #define init_position_y 77.2210540771484  // waypoint_test
+
+#define LOCAL_X                 0
+#define LOCAL_Y                 1
+#define IDX_DIFF                20
+#define MAX_LATERAL_ACCEL_MS2   1.5  // 3.5
+#define MAX_SPEED_KPH           40
+#define START_END_SPEED_KPH     30
+#define WINDOW_SIZE             10
+#define THRESHOLD_SIZE          1
 
 class PointControl {
   private:
@@ -65,13 +77,21 @@ class PointControl {
 
     ros::Subscriber center_marker_sub;
     geometry_msgs::PoseArray center_points;
-    bool global_planning = false;
+    // bool global_planning = true;  // waypoint_test
+    bool global_planning = false;  // not_waypoint_test
     bool waypoint_stop = false;
 
     double current_speed;                              // speedometer
     int purepursuit_waypoint_count = 0;
     double Ld, wheelbase, purepursuit_d;
     double purepursuit_current_co_tf_x, purepursuit_current_co_tf_y;
+    
+    std::vector<double> velocity_vec;
+    std::vector<double> filter_vec;
+    double target_speed_ms = 30.0 / 3.6;
+    int velocity_container_count = 0;
+    double stop = 0.0;
+    double start_end_speed_ms = 0.0;
 
   public:
     PointControl();
@@ -86,6 +106,7 @@ class PointControl {
     double cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg);  //yaw값 구하는 함수
     std::pair<double, double> coordinate_tf(double input_x, double input_y);    // transform coordinate from vehicle
     void next_point();
+    void next_speed();
     void pure_pursuit();
     void purepursuit_next_point();
     void speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg);  //현재 속도
@@ -100,6 +121,10 @@ class PointControl {
     void calc_sliding_window_near_point();
     void calc_sliding_window_error();
     void lateral_error();
+
+    void SetVelocityProfile(std::vector<std::vector<double>>& container);
+    std::vector<double> MovingAveFilter(const std::vector<double>& data);
+    std::vector<double> reconstructionFilter(const std::vector<double>& data);
 
     void Print();
     void publish();

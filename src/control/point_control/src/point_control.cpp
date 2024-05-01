@@ -47,6 +47,7 @@ void PointControl::ReadCenterLine() {
                 waypoint_vec.push_back(map_XY);
             }
             waypoint_stop = true;
+            SetVelocityProfile(waypoint_vec);
         }
     }
 }
@@ -93,6 +94,7 @@ void PointControl::waypoint() {
         }
         waypoint_vec.push_back(map_XY);
     }
+    SetVelocityProfile(waypoint_vec);
 }
 
 std::vector<std::string> PointControl::divide(std::string xy_str, char divider){
@@ -209,6 +211,7 @@ std::pair<double, double> PointControl::coordinate_tf(double input_x, double inp
 }
 
 void PointControl::next_point() {
+    // ROS_INFO("next_point start");
     int count = 0;
     
     std::vector<double> waypoint;
@@ -217,6 +220,7 @@ void PointControl::next_point() {
         if(count == purepursuit_waypoint_count){
             break;
         }
+        // ROS_INFO("waypoint_vec for");
 
         waypoint = *itr;
 
@@ -227,6 +231,24 @@ void PointControl::next_point() {
     }
 
     purepursuit_waypoint_count++;
+}
+
+void PointControl::next_speed() {
+    // ROS_INFO("next_speed start");
+    int count = 0;
+
+    for(std::vector<double>::iterator itr = velocity_vec.begin(); itr != velocity_vec.end(); ++itr) {
+        if(count == velocity_container_count){
+            break;
+        }
+        // ROS_INFO("velocity_container for");
+
+        target_speed_ms = *itr;
+
+        count++;
+    }
+
+    velocity_container_count++;
 }
 
 void PointControl::pure_pursuit(){
@@ -261,8 +283,9 @@ void PointControl::pure_pursuit(){
 
 void PointControl::purepursuit_next_point(){
     wheelbase = 2.66503413435;     // wheelbase
-    // Ld = -1.0 + (0.125 * current_speed);  // look ahead distance
-    Ld = 5.0;
+    double velocity = current_speed * 3.6;
+    Ld = 0 + (0.25 * velocity);  // TODO:tunnings
+    // Ld = 5.0;
     if (Ld <= 2.0) {
         Ld = 2.0;
     }
@@ -275,6 +298,7 @@ void PointControl::purepursuit_next_point(){
         purepursuit_d = sqrt( pow(purepursuit_current_co_tf_x, 2) + pow(purepursuit_current_co_tf_y, 2) );  // target distance from rear wheel
         if (purepursuit_d <= Ld) {
             next_point();
+            next_speed();
         }
         else {
             break;
@@ -287,18 +311,18 @@ void PointControl::speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg) 
 }
 
 void PointControl::PID(const std_msgs::Float32::ConstPtr& speed_msg){
-    double p, i, d, Kp, Ki, Kd, target_speed, error, previous_error, delta_error, error_integral, error_derivative;
-
+    double p, i, d, Kp, Ki, Kd, error, previous_error, delta_error, error_integral, error_derivative;
+    
     Kp = 0.7;
     Ki = 0.15;
     Kd = 0.001;
     
     double delta_time = 0.01;   
     double high = 0.1;
-    target_speed = SPEED / 3.6;
+    // target_speed_ms = SPEED_KPH / 3.6;
 
     current_speed = speed_msg->data;
-    error = target_speed - current_speed;
+    error = target_speed_ms - current_speed;
     delta_error = error - previous_error;
     error_integral = error_integral + (error * delta_time);
     if ( error_integral >= (high / Ki) ) {
@@ -318,6 +342,21 @@ void PointControl::PID(const std_msgs::Float32::ConstPtr& speed_msg){
     if (accelerator >= 1.0) {
         accelerator = 1.0;
     }
+
+
+    if (accelerator < 0 && error < 0) {
+    stop = -accelerator;
+
+    if (stop >= 1) {
+        stop = 1.0;
+    }
+    else if (stop <= 0.0) {
+        stop = 0.0;
+    }
+    }
+    else {
+    stop = 0.0;
+    }
 }
 
 void PointControl::control() {
@@ -327,7 +366,7 @@ void PointControl::control() {
     move.header.frame_id = "map";
     move.throttle = accelerator;      //0.0 ~ 1.0
     move.steer = angle;               //-1.0 ~ 1.0
-    move.brake = 0.0;                 //0.0 ~ 1.0
+    move.brake = stop;                 //0.0 ~ 1.0
     move.hand_brake = false;
     move.reverse = false;
     move.gear = 1;                    // D = 1,  N = 0,  R = -1
@@ -458,8 +497,140 @@ void PointControl::calc_sliding_window_error() {
     sliding_window_error_pub.publish(sliding_window_error_msg);
 }
 
+void PointControl::SetVelocityProfile(std::vector<std::vector<double>>& container) {
+    std::vector<double> velocity_container;
+    // ROS_INFO("size = %i", container.size());
+
+    for (int idx = IDX_DIFF; idx < container.size()-IDX_DIFF; idx++) {
+        arma::vec prev_now(3, arma::fill::zeros);
+        arma::vec now_prev(3, arma::fill::zeros);
+        arma::vec next_now(3, arma::fill::zeros);
+        arma::vec next_prev(3, arma::fill::zeros);
+        // ROS_INFO("idx = %i", idx);
+        
+
+        prev_now = {
+            container[idx-IDX_DIFF][LOCAL_X] - container[idx][LOCAL_X],
+            container[idx-IDX_DIFF][LOCAL_Y] - container[idx][LOCAL_Y],
+            0.0     
+        };
+        now_prev = {
+            container[idx][LOCAL_X] - container[idx-IDX_DIFF][LOCAL_X],
+            container[idx][LOCAL_Y] - container[idx-IDX_DIFF][LOCAL_Y],
+            0.0
+        };        
+        next_now = {
+            container[idx+IDX_DIFF-1][LOCAL_X] - container[idx][LOCAL_X],
+            container[idx+IDX_DIFF-1][LOCAL_Y] - container[idx][LOCAL_Y],
+            0.0
+        };
+        next_prev = {
+            container[idx+IDX_DIFF-1][LOCAL_X] - container[idx-IDX_DIFF][LOCAL_X],
+            container[idx+IDX_DIFF-1][LOCAL_Y] - container[idx-IDX_DIFF][LOCAL_Y],
+            0.0
+        };        
+        // ROS_INFO("01 = %f", container[idx-IDX_DIFF][LOCAL_X]);
+        // ROS_INFO("02 = %f", container[idx][LOCAL_X]);
+        // ROS_INFO("11 = %f", container[idx-IDX_DIFF][LOCAL_Y]);
+        // ROS_INFO("12 = %f", container[idx][LOCAL_Y]);
+        // ROS_INFO("x = %f", prev_now[0]);
+        // ROS_INFO("y = %f", prev_now[1]);
+        // ROS_INFO("size = %i", prev_now.size());
+
+        double boonja = 2.0 * arma::norm(arma::cross(next_now, prev_now), 2);
+        double boonmo = arma::norm(next_now, 2) * arma::norm(now_prev, 2) * arma::norm(next_prev, 2);
+        double kappa = boonja / boonmo;
+        double max_vel_ms = sqrt(MAX_LATERAL_ACCEL_MS2 / (kappa));
+        // double max_vel_ms = 0.5 * sqrt(MAX_LATERAL_ACCEL_MS2 / (kappa));
+        double speed_max = MAX_SPEED_KPH/3.6;
+        if(max_vel_ms > speed_max) {
+            max_vel_ms = speed_max;
+        }
+        velocity_container.push_back(max_vel_ms);
+        // ROS_INFO("velocity_container pushback");
+    }
+    start_end_speed_ms = START_END_SPEED_KPH/3.6;
+    for (int i = 0; i < IDX_DIFF; i++) {
+        velocity_container.insert(velocity_container.begin(), start_end_speed_ms);
+    }
+    for (int i = 0; i < IDX_DIFF / 2; i++) {
+        velocity_container.push_back(start_end_speed_ms);
+    }
+    for (int i = 0; i < IDX_DIFF / 2; i++) {
+        double end_speed = 0.0;
+        velocity_container.push_back(end_speed);
+    }
+    // ROS_INFO("velocity_container size = %i", velocity_container.size());
+    // for (int i = 0; i < velocity_container.size(); i++) {
+    //     double vel = velocity_container[i] * 3.6;
+    //     ROS_INFO("speed = %f", vel);
+    // }
+    filter_vec = MovingAveFilter(velocity_container);
+    // ROS_INFO("filter_vec size = %i", filter_vec.size());
+    velocity_vec = reconstructionFilter(filter_vec);
+    // ROS_INFO("velocity_vec size = %i", velocity_vec.size());
+    // for (int i = 0; i < velocity_vec.size(); i++) {
+    //     double vel = velocity_vec[i] * 3.6;
+    //     ROS_INFO("speed = %f", vel);
+    // }
+}
+
+std::vector<double> PointControl::MovingAveFilter(const std::vector<double>& data) {
+    std::vector<double> result;
+    int dataSize = data.size();
+    int windowSize = WINDOW_SIZE;
+    
+    // 데이터가 windowSize보다 작으면 그대로 반환
+    if (dataSize < windowSize) {
+        return result;
+    }
+
+    for (int i = 0; i <= dataSize - windowSize; ++i) {
+        double sum = 0.0;
+        for (int j = i; j < i + windowSize; ++j) {
+            sum += data[j];
+        }
+        result.push_back(sum / windowSize);
+    }
+    result.erase(result.end() - 1);
+
+    for (int i = 0; i < windowSize; i++) {
+        result.insert(result.begin(), start_end_speed_ms);
+    }
+
+    return result;
+}
+
+std::vector<double> PointControl::reconstructionFilter(const std::vector<double>& data) {
+    std::vector<double> result;
+    double threshold = THRESHOLD_SIZE;
+
+    // 첫 번째 데이터는 그대로 저장
+    result.push_back(data[0]);
+
+    // 데이터 변화를 추적하고, 변화가 큰 경우 smoothing
+    for (int i = 1; i < data.size() - 1; ++i) {
+        double diff1 = std::abs(data[i] - data[i - 1]);
+        double diff2 = std::abs(data[i] - data[i + 1]);
+
+        // 변화가 큰 경우 smoothing
+        if (diff1 > threshold && diff2 > threshold) {
+            result.push_back((data[i - 1] + data[i] + data[i + 1]) / 3.0);
+        } else {
+            result.push_back(data[i]);
+        }
+    }
+
+    // 마지막 데이터는 그대로 저장
+    result.push_back(data[data.size() - 1]);
+
+    return result;
+}
+
 void PointControl::Print() {
     ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
+    double target_speed_kph = target_speed_ms * 3.6;
+    ROS_INFO("target_speed_kph = %f", target_speed_kph);
 }
 
 void PointControl::publish() {
@@ -471,7 +642,7 @@ void PointControl::publish() {
 
 void PointControl::Run() {
     if (!waypoint_stop) {
-        ReadCenterLine();
+        ReadCenterLine();  // not_waypoint_test
     }
     if (global_planning) {
         // pure_pursuit();
@@ -485,7 +656,7 @@ void PointControl::Run() {
 int main( int argc, char** argv ) {
     ros::init(argc, argv, "point_control");
     PointControl point_control;
-    // point_control.waypoint();
+    // point_control.waypoint();  // waypoint_test
     // point_control.ReadCenterLine();
     ros::Rate loop_rate(30);  //1초에 30번
 

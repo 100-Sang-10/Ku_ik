@@ -645,8 +645,6 @@ void PointControl::Run() {
         ReadCenterLine();  // not_waypoint_test
     }
     if (global_planning) {
-        // pure_pursuit();
-
         purepursuit_next_point();
         publish();
     }

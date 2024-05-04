@@ -7,8 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /Marker1
-        - /MarkerArray2
-        - /MarkerArray2/Status1
       Splitter Ratio: 0.5
     Tree Height: 978
   - Class: rviz/Selection
@@ -59,7 +57,7 @@ Visualization Manager:
       Marker Topic: /left_marker
       Name: Marker
       Namespaces:
-        leftline: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -67,7 +65,7 @@ Visualization Manager:
       Marker Topic: /right_marker
       Name: Marker
       Namespaces:
-        rightline: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -78,10 +76,10 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: true
-    - Class: rviz/MarkerArray
+    - Class: rviz/Marker
       Enabled: true
       Marker Topic: /center_marker
-      Name: MarkerArray
+      Name: Marker
       Namespaces:
         {}
       Queue Size: 100
@@ -113,7 +111,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0
+      Angle: 0.009999999776482582
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549

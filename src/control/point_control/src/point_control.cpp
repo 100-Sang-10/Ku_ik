@@ -68,6 +68,7 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
 
 void PointControl::waypoint() {
     std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
+    // std::ifstream in("/home/baek/git/Ku_ik/resources/dynamic_vehicle_waypoint.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");

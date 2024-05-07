@@ -17,6 +17,8 @@
 #include <std_msgs/Int64.h>
 #include <WGS84toCartesian.hpp>
 #include <armadillo>
+#include <chrono>
+#include <thread>
 
 #define SPEED_KPH  30
 #define sliding_window_dis 5.0
@@ -35,6 +37,16 @@
 #define START_END_SPEED_KPH     30
 #define WINDOW_SIZE             10
 #define THRESHOLD_SIZE          1
+
+#define DELIVERY_STOP_DISTANCE  5.0
+#define A_ZONE_X                -77.0
+#define A_ZONE_Y                186.4
+#define B_ZONE_X                -10.0
+#define B_ZONE_Y                186.4
+#define C_ZONE_X                0.0
+#define C_ZONE_Y                0.0
+#define D_ZONE_X                0.0
+#define D_ZONE_Y                0.0
 
 class PointControl {
   private:
@@ -92,6 +104,10 @@ class PointControl {
     int velocity_container_count = 0;
     double stop = 0.0;
     double start_end_speed_ms = 0.0;
+    bool delivery_zone = false;
+    bool delivery_time = false;
+    bool delivery_end = false;
+    double distance_a, distance_b, distance_c, distance_d;
 
   public:
     PointControl();
@@ -107,6 +123,8 @@ class PointControl {
     std::pair<double, double> coordinate_tf(double input_x, double input_y);    // transform coordinate from vehicle
     void next_point();
     void next_speed();
+    bool DeliveryZone();
+    void DeliveryStop();
     void pure_pursuit();
     void purepursuit_next_point();
     void speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg);  //현재 속도

@@ -250,6 +250,52 @@ void PointControl::next_speed() {
     }
 
     velocity_container_count++;
+    if (velocity_container_count >= velocity_vec.size()) {
+        target_speed_ms = 0;
+    }
+}
+
+bool PointControl::DeliveryZone() {
+    bool delivery_zone = false;
+    double distance = DELIVERY_STOP_DISTANCE;
+    double a_x = A_ZONE_X;
+    double a_y = A_ZONE_Y;
+    double b_x = B_ZONE_X;
+    double b_y = B_ZONE_Y;
+    double c_x = C_ZONE_X;
+    double c_y = C_ZONE_Y;
+    double d_x = D_ZONE_X;
+    double d_y = D_ZONE_Y;
+    double x_a = ego_vehicle_x - a_x;
+    double y_a = ego_vehicle_y - a_y;
+    double x_b = ego_vehicle_x - b_x;
+    double y_b = ego_vehicle_y - b_y;
+    double x_c = ego_vehicle_x - c_x;
+    double y_c = ego_vehicle_y - c_y;
+    double x_d = ego_vehicle_x - d_x;
+    double y_d = ego_vehicle_y - d_y;
+    distance_a = sqrt(pow(x_a, 2) + pow(y_a, 2));
+    distance_b = sqrt(pow(x_b, 2) + pow(y_b, 2));
+    distance_c = sqrt(pow(x_c, 2) + pow(y_c, 2));
+    distance_d = sqrt(pow(x_d, 2) + pow(y_d, 2));
+    if (distance_a < distance || distance_b < distance || distance_c < distance || distance_d < distance) {
+        delivery_zone = true; 
+    }
+    else {
+        delivery_zone = false;
+        delivery_end = false;
+    }
+
+    return delivery_zone;
+}
+
+void PointControl::DeliveryStop() {
+    if (delivery_zone) {
+        target_speed_ms = 0.0;
+        if(current_speed == 0) {
+            delivery_time = true;
+        }
+    }
 }
 
 void PointControl::pure_pursuit(){
@@ -374,6 +420,12 @@ void PointControl::control() {
     move.manual_gear_shift = false;
     if (global_planning) {
         control_pub.publish(move);
+        if (delivery_zone && delivery_time) {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            delivery_time = false;
+            delivery_end = true;
+            next_speed();
+        }
     }
 }
 
@@ -407,6 +459,7 @@ void PointControl::calc_midpoint() {
     // ROS_INFO("mid_co_tf_x = %f", mid_co_tf_x);
     // ROS_INFO("mid_co_tf_y = %f", mid_co_tf_y);
 }
+
 void PointControl::purepursuit_point_marker() {
     purepursuit_point.header.frame_id = "map";
     purepursuit_point.header.stamp = ros::Time::now();
@@ -629,9 +682,15 @@ std::vector<double> PointControl::reconstructionFilter(const std::vector<double>
 }
 
 void PointControl::Print() {
-    ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
+    // ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
     double target_speed_kph = target_speed_ms * 3.6;
     ROS_INFO("target_speed_kph = %f", target_speed_kph);
+    ROS_INFO("distance_a = %f", distance_a);
+    ROS_INFO("distance_b = %f", distance_b);
+    ROS_INFO("delivery_end = %i", delivery_end);
+    ROS_INFO("delivery_zone = %i", delivery_zone);
+    ROS_INFO("delivery_time = %i", delivery_time);
+    ROS_INFO("========================================");
 }
 
 void PointControl::publish() {
@@ -647,6 +706,10 @@ void PointControl::Run() {
     }
     if (global_planning) {
         purepursuit_next_point();
+        delivery_zone = DeliveryZone();
+        if (!delivery_end) {
+            DeliveryStop();
+        }
         publish();
     }
     Print();

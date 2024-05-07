@@ -89,7 +89,7 @@ Visualization Manager:
       Marker Topic: /purepursuit_point_marker
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
@@ -119,7 +119,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -1.5649988651275635
+      Angle: -0.009999575093388557
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -129,10 +129,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 12.300299644470215
+      Scale: 1.7561314105987549
       Target Frame: <Fixed Frame>
-      X: -130.5923309326172
-      Y: 165.00125122070312
+      X: -36.79191970825195
+      Y: -4.084874629974365
     Saved: ~
 Window Geometry:
   Displays:

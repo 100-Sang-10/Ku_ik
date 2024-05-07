@@ -13,6 +13,19 @@ PointControl::PointControl() {
     sliding_window_error_pub = nh.advertise<std_msgs::Float32>("/sliding_window_error",100);
 
     center_marker_sub = nh.subscribe("/center_line_point", 100, &PointControl::OsmCallback, this);
+
+    object_sub = nh.subscribe("/fusion_info", 100, &PointControl::ObjectCallback, this);
+}
+
+void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
+    fusion_msg = *obj_msg;
+    std::string object_callback = fusion_msg.Class;
+    if (object_callback == "") {
+        obeject_detection = false;
+    }
+    else {
+        obeject_detection = true;
+    }
 }
 
 void PointControl::OsmCallback(const geometry_msgs::PoseArray::ConstPtr& center_line_msg){
@@ -298,7 +311,7 @@ void PointControl::DeliveryStop() {
     }
 }
 
-void PointControl::pure_pursuit(){
+void PointControl::pure_pursuit() {
     waypoint_angle = - atan2( 2 * purepursuit_current_co_tf_y * wheelbase, pow(purepursuit_d, 2) ) * (2 / M_PI);  // steering: -1.0 ~ 1.0
     // waypoint_angle *= 1.221730351448059;                                                              // steering ratio
 
@@ -328,7 +341,7 @@ void PointControl::pure_pursuit(){
     }
 }
 
-void PointControl::purepursuit_next_point(){
+void PointControl::purepursuit_next_point() {
     wheelbase = 2.66503413435;     // wheelbase
     double velocity = current_speed * 3.6;
     Ld = 0 + (0.25 * velocity);  // TODO:tunnings
@@ -681,6 +694,44 @@ std::vector<double> PointControl::reconstructionFilter(const std::vector<double>
     return result;
 }
 
+void PointControl::ObjectDetection() {
+    std::string object_type = fusion_msg.Class;
+    double object_distance = fusion_msg.distance;
+    if (object_type == "pedesatrian") {
+        pedestrian_distance = object_distance;
+        PedestrianStop();
+    }
+    else if(object_type == "vehicle") {
+        dynamic_vehicle_distance = object_distance;
+        DynamicVehicleVelocity();
+    }
+}
+
+void PointControl::PedestrianStop() {
+    if(pedestrian_distance <= 7) {
+        accelerator = 0.0;
+        stop = 1.0;
+    }
+}
+
+void PointControl::DynamicVehicleVelocity() {
+    if(dynamic_vehicle_distance < 20) {
+        accelerator = 0.0;
+        if(dynamic_vehicle_distance < 10) {
+            stop = 0.5;
+        }
+        else if(dynamic_vehicle_distance < 5) {
+            stop = 1.0;
+        }
+        else {
+            stop = 0.0;
+        }
+    }
+    else if(dynamic_vehicle_distance > 20) {
+        accelerator += 0.1;
+    }
+}
+
 void PointControl::Print() {
     // ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
     double target_speed_kph = target_speed_ms * 3.6;
@@ -710,6 +761,9 @@ void PointControl::Run() {
         if (!delivery_end) {
             DeliveryStop();
         }
+        // if (obeject_detection) {
+        //     ObjectDetection();
+        // }
         publish();
     }
     Print();

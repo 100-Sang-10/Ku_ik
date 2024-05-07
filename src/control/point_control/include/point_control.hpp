@@ -19,6 +19,7 @@
 #include <armadillo>
 #include <chrono>
 #include <thread>
+#include <detection_msgs/SensorFusion.h>
 
 #define SPEED_KPH  30
 #define sliding_window_dis 5.0
@@ -39,14 +40,14 @@
 #define THRESHOLD_SIZE          1
 
 #define DELIVERY_STOP_DISTANCE  5.0
-#define A_ZONE_X                -77.0
-#define A_ZONE_Y                186.4
-#define B_ZONE_X                -10.0
-#define B_ZONE_Y                186.4
-#define C_ZONE_X                0.0
-#define C_ZONE_Y                0.0
-#define D_ZONE_X                0.0
-#define D_ZONE_Y                0.0
+#define A_ZONE_X                37.1479187012   // -77.0
+#define A_ZONE_Y                35.9507026672   // 186.4
+#define B_ZONE_X                -196.809158325  // -10.0
+#define B_ZONE_Y                -43.3376693726  // 186.4
+#define C_ZONE_X                -156.98789978
+#define C_ZONE_Y                -96.6370849609
+#define D_ZONE_X                87.8212203979
+#define D_ZONE_Y                -86.132522583
 
 class PointControl {
   private:
@@ -109,8 +110,15 @@ class PointControl {
     bool delivery_end = false;
     double distance_a, distance_b, distance_c, distance_d;
 
+    ros::Subscriber object_sub;
+    detection_msgs::SensorFusion fusion_msg;
+    bool obeject_detection = false;
+    double pedestrian_distance = 100;
+    double dynamic_vehicle_distance = 100;
+
   public:
     PointControl();
+    void ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg);
     void OsmCallback(const geometry_msgs::PoseArray::ConstPtr& center_line_msg);
     void ReadCenterLine();
     std::vector<double> WGS84toCartesian(double input_lat, double input_long);  // (latitude, longitude) to (x, y)
@@ -143,6 +151,10 @@ class PointControl {
     void SetVelocityProfile(std::vector<std::vector<double>>& container);
     std::vector<double> MovingAveFilter(const std::vector<double>& data);
     std::vector<double> reconstructionFilter(const std::vector<double>& data);
+    
+    void ObjectDetection();
+    void PedestrianStop();
+    void DynamicVehicleVelocity();
 
     void Print();
     void publish();

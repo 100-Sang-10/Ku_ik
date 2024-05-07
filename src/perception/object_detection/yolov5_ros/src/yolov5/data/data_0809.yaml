@@ -1,0 +1,11 @@
+names:
+- bike
+- green
+- pedesatrian
+- red
+- speed_limit
+- vehicle
+- yellow
+nc: 7
+train: /content/dataset/train.txt
+val: /content/dataset/val.txt

@@ -20,12 +20,12 @@
 #include <std_msgs/Int64.h>
 #include <WGS84toCartesian.hpp>
 
-#define LOOK_AHEAD_DISTANCE 10
+#define LOOK_AHEAD_DISTANCE 2
 #define TARGET_SPEED_KPH  20
 #define init_position_x -132.0
 #define init_position_y  14.5
 
-class DynamicVehicleControl {
+class DynamicVehicleControl1 {
   private:
     ros::NodeHandle nh;
 
@@ -53,8 +53,8 @@ class DynamicVehicleControl {
     float curr_speed;
     
   public:
-    DynamicVehicleControl();
-    ~DynamicVehicleControl();
+    DynamicVehicleControl1();
+    ~DynamicVehicleControl1();
 
     void SpeedCallback(const std_msgs::Float32::ConstPtr speed_msg);
     void PoseCallback(const nav_msgs::Odometry::ConstPtr odom_msg);
@@ -78,27 +78,27 @@ class DynamicVehicleControl {
     void Run();
 };
 
-DynamicVehicleControl::DynamicVehicleControl() {
-    waypoint_pub = nh.advertise<visualization_msgs::Marker>("/dynamic_vehicle/waypoint_marker", 100);
-    control_pub = nh.advertise<carla_msgs::CarlaEgoVehicleControl>("/carla/dynamic_vehicle/vehicle_control_cmd", 1000);
-    speed_sub = nh.subscribe("/carla/dynamic_vehicle/speedometer", 10, &DynamicVehicleControl::SpeedCallback, this);
-    odom_sub = nh.subscribe("/carla/dynamic_vehicle/odometry", 10, &DynamicVehicleControl::PoseCallback, this);
-    purepursuit_point_pub = nh.advertise<visualization_msgs::Marker>("/dynamic_vehicle/point_marker", 100);
+DynamicVehicleControl1::DynamicVehicleControl1() {
+    waypoint_pub = nh.advertise<visualization_msgs::Marker>("/dynamic_vehicle_1/waypoint_marker", 100);
+    control_pub = nh.advertise<carla_msgs::CarlaEgoVehicleControl>("/carla/dynamic_vehicle_1/vehicle_control_cmd", 1000);
+    speed_sub = nh.subscribe("/carla/dynamic_vehicle_1/speedometer", 10, &DynamicVehicleControl1::SpeedCallback, this);
+    odom_sub = nh.subscribe("/carla/dynamic_vehicle_1/odometry", 10, &DynamicVehicleControl1::PoseCallback, this);
+    purepursuit_point_pub = nh.advertise<visualization_msgs::Marker>("/dynamic_vehicle_1/point_marker", 100);
 }
 
-DynamicVehicleControl::~DynamicVehicleControl() {}
+DynamicVehicleControl1::~DynamicVehicleControl1() {}
 
-void DynamicVehicleControl::SpeedCallback(const std_msgs::Float32::ConstPtr speed_msg) {
+void DynamicVehicleControl1::SpeedCallback(const std_msgs::Float32::ConstPtr speed_msg) {
     curr_speed = speed_msg->data;
 }
 
-void DynamicVehicleControl::PoseCallback(const nav_msgs::Odometry::ConstPtr odom_msg) {
+void DynamicVehicleControl1::PoseCallback(const nav_msgs::Odometry::ConstPtr odom_msg) {
     dynamic_vehicle_x = odom_msg->pose.pose.position.x;
     dynamic_vehicle_y = odom_msg->pose.pose.position.y;
     dynamic_vehicle_yaw = cal_yaw(odom_msg);
 }
 
-std::vector<double> DynamicVehicleControl::WGS84toCartesian(double input_lat, double input_long) {
+std::vector<double> DynamicVehicleControl1::WGS84toCartesian(double input_lat, double input_long) {
     std::array<double, 2> WGS84Position {input_lat, input_long};
     std::array<double, 2> cartesian_position {wgs84::toCartesian(WSG84Reference, WGS84Position)};
 
@@ -112,8 +112,9 @@ std::vector<double> DynamicVehicleControl::WGS84toCartesian(double input_lat, do
     return XY;
 }
 
-void DynamicVehicleControl::waypoint() {
-    std::ifstream in("../Ku_ik/resources/dynamic_vehicle_waypoint.txt");
+void DynamicVehicleControl1::waypoint() {
+    // std::ifstream in("../Ku_ik/resources/dynamic_vehicle_1_waypoint.txt");
+    std::ifstream in("../Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_1_waypoint.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
@@ -142,7 +143,7 @@ void DynamicVehicleControl::waypoint() {
     }
 }
 
-std::vector<std::string> DynamicVehicleControl::divide(std::string xy_str, char divider){
+std::vector<std::string> DynamicVehicleControl1::divide(std::string xy_str, char divider){
     std::istringstream s(xy_str);
     std::string buffer;
     std::vector<std::string> result;
@@ -154,7 +155,7 @@ std::vector<std::string> DynamicVehicleControl::divide(std::string xy_str, char 
     return result;
 }
 
-double DynamicVehicleControl::to_num(std::string s){
+double DynamicVehicleControl1::to_num(std::string s){
     std::istringstream ss(s);
     double x;
     ss >> x;
@@ -162,7 +163,7 @@ double DynamicVehicleControl::to_num(std::string s){
     return x;
 }
 
-void DynamicVehicleControl::visualize_waypoint(){
+void DynamicVehicleControl1::visualize_waypoint(){
     std::vector<double> waypoint;
     visualization_msgs::Marker points, line_strip;
 
@@ -205,7 +206,7 @@ void DynamicVehicleControl::visualize_waypoint(){
     waypoint_pub.publish(line_strip);
 }
 
-double DynamicVehicleControl::cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg) {
+double DynamicVehicleControl1::cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_msg) {
     tf::Quaternion q(
         odom_msg->pose.pose.orientation.x,
         odom_msg->pose.pose.orientation.y,
@@ -218,7 +219,7 @@ double DynamicVehicleControl::cal_yaw(const nav_msgs::Odometry::ConstPtr& odom_m
     return yaw;
 }
 
-std::pair<double, double> DynamicVehicleControl::coordinate_tf(double input_x, double input_y) {
+std::pair<double, double> DynamicVehicleControl1::coordinate_tf(double input_x, double input_y) {
     double x, y, a, d, output_x, output_y;
 
     x = input_x - dynamic_vehicle_x;
@@ -232,15 +233,15 @@ std::pair<double, double> DynamicVehicleControl::coordinate_tf(double input_x, d
     return std::make_pair(output_x, output_y);
 }
 
-void DynamicVehicleControl::next_point() {
-    ROS_INFO("next_point start");
+void DynamicVehicleControl1::next_point() {
+    // ROS_INFO("next_point start");
     int count = 0;
     
     std::vector<double> waypoint;
 
     for(std::vector<std::vector<double>>::iterator itr = waypoint_vec.begin(); itr != waypoint_vec.end(); ++itr) {
-        ROS_INFO("count = %i", count);
-        ROS_INFO("purepursuit_waypoint_count = %i", purepursuit_waypoint_count);
+        // ROS_INFO("count = %i", count);
+        // ROS_INFO("purepursuit_waypoint_count = %i", purepursuit_waypoint_count);
         if(count == purepursuit_waypoint_count){
             break;
         }
@@ -261,7 +262,7 @@ void DynamicVehicleControl::next_point() {
     }
 }
 
-void DynamicVehicleControl::pure_pursuit(){
+void DynamicVehicleControl1::pure_pursuit(){
     angle = - atan2( 2 * purepursuit_current_co_tf_y * wheelbase, pow(purepursuit_d, 2) ) * (2 / M_PI);
 
     if (angle >= 1.0) {
@@ -272,7 +273,7 @@ void DynamicVehicleControl::pure_pursuit(){
     }
 }
 
-void DynamicVehicleControl::purepursuit_next_point(){
+void DynamicVehicleControl1::purepursuit_next_point(){
     wheelbase = 2.900078125019439;     // wheelbase
     double velocity = curr_speed * 3.6;
     // Ld = 0 + (0.25 * velocity);  // TODO:tunnings
@@ -296,7 +297,7 @@ void DynamicVehicleControl::purepursuit_next_point(){
     }
 }
 
-void DynamicVehicleControl::purepursuit_point_marker() {
+void DynamicVehicleControl1::purepursuit_point_marker() {
     purepursuit_point.header.frame_id = "map";
     purepursuit_point.header.stamp = ros::Time::now();
     purepursuit_point.action = visualization_msgs::Marker::ADD;
@@ -321,7 +322,7 @@ void DynamicVehicleControl::purepursuit_point_marker() {
     purepursuit_point_pub.publish(purepursuit_point);
 }
 
-void DynamicVehicleControl::PID(){
+void DynamicVehicleControl1::PID(){
     double p, i, d, Kp, Ki, Kd, error, target_speed_ms, previous_error, delta_error, error_integral, error_derivative;
     
     Kp = 0.7;
@@ -370,7 +371,7 @@ void DynamicVehicleControl::PID(){
     }
 }
 
-void DynamicVehicleControl::Control() {    
+void DynamicVehicleControl1::Control() {    
     // control_msg.header.stamp = ros::Time::now();
     // control_msg.header.frame_id = "map";
     control_msg.throttle = accelerator;      //0.0 ~ 1.0
@@ -382,20 +383,20 @@ void DynamicVehicleControl::Control() {
     // control_msg.manual_gear_shift = false;
 }
 
-void DynamicVehicleControl::Print() {
+void DynamicVehicleControl1::Print() {
     // ROS_INFO("curr_speed = %f", curr_speed);
     // ROS_INFO("throttle = %f", accelerator);
     // ROS_INFO("steer = %f", angle);
     // ROS_INFO("brake = %f", stop);
 }
 
-void DynamicVehicleControl::Publish() {
+void DynamicVehicleControl1::Publish() {
     visualize_waypoint();
     purepursuit_point_marker();
     control_pub.publish(control_msg);
 }
 
-void DynamicVehicleControl::Run() {
+void DynamicVehicleControl1::Run() {
     purepursuit_next_point();
     pure_pursuit();
     PID();
@@ -405,13 +406,13 @@ void DynamicVehicleControl::Run() {
 }
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "dynamic_vehicle_control");
-    DynamicVehicleControl dynamic_vehicle_control;
-    dynamic_vehicle_control.waypoint();
+    ros::init(argc, argv, "dynamic_vehicle_1_control");
+    DynamicVehicleControl1 dynamic_vehicle_1_control;
+    dynamic_vehicle_1_control.waypoint();
     ros::Rate loop_rate(30);
 
     while(ros::ok()) {   
-        dynamic_vehicle_control.Run();
+        dynamic_vehicle_1_control.Run();
         ros::spinOnce();
         loop_rate.sleep();
     }

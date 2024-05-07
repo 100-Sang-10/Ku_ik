@@ -109,8 +109,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
- LIBRARIES dynamic_vehicle_control
- CATKIN_DEPENDS carla_msgs geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs visualization_msgs
+#  LIBRARIES dynamic_vehicle_control
+#  CATKIN_DEPENDS carla_msgs geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs visualization_msgs
 #  DEPENDS system_lib
 )
 
@@ -121,13 +121,21 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(dynamic_vehicle_control src/dynamic_vehicle_control.cpp)
-add_dependencies(dynamic_vehicle_control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(dynamic_vehicle_control ${catkin_LIBRARIES})
+add_executable(dynamic_vehicle_1_control src/dynamic_vehicle_1_control.cpp)
+add_dependencies(dynamic_vehicle_1_control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(dynamic_vehicle_1_control ${catkin_LIBRARIES})
+
+add_executable(dynamic_vehicle_2_control src/dynamic_vehicle_2_control.cpp)
+add_dependencies(dynamic_vehicle_2_control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(dynamic_vehicle_2_control ${catkin_LIBRARIES})
+
+add_executable(dynamic_vehicle_3_control src/dynamic_vehicle_3_control.cpp)
+add_dependencies(dynamic_vehicle_3_control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(dynamic_vehicle_3_control ${catkin_LIBRARIES})
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

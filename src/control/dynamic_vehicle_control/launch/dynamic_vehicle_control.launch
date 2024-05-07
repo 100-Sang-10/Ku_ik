@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="dynamic_vehicle_control" type="dynamic_vehicle_1_control" name="dynamic_vehicle_1_control"  output="screen"/>
+  <node pkg="dynamic_vehicle_control" type="dynamic_vehicle_2_control" name="dynamic_vehicle_2_control"  output="screen"/>
+  <node pkg="dynamic_vehicle_control" type="dynamic_vehicle_3_control" name="dynamic_vehicle_3_control"  output="screen"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find dynamic_vehicle_control)/config/dynamic_vehicle_control.rviz" />
+</launch>

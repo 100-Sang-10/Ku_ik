@@ -115,6 +115,7 @@ class PointControl {
     bool obeject_detection = false;
     double pedestrian_distance = 100;
     double dynamic_vehicle_distance = 100;
+    double prev_dynamic_vehicle_distance;
 
   public:
     PointControl();

@@ -19,12 +19,12 @@ PointControl::PointControl() {
 
 void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
     fusion_msg = *obj_msg;
-    std::string object_callback = fusion_msg.Class;
-    if (object_callback == "") {
-        obeject_detection = false;
+    bool object_callback = fusion_msg.toggle;
+    if (object_callback) {
+        obeject_detection = true;
     }
     else {
-        obeject_detection = true;
+        obeject_detection = false;
     }
 }
 
@@ -761,9 +761,9 @@ void PointControl::Run() {
         if (!delivery_end) {
             DeliveryStop();
         }
-        // if (obeject_detection) {
-        //     ObjectDetection();
-        // }
+        if (obeject_detection) {
+            ObjectDetection();
+        }
         publish();
     }
     Print();

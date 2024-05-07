@@ -80,8 +80,9 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
 }
 
 void PointControl::waypoint() {
-    std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
+    // std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
     // std::ifstream in("/home/baek/git/Ku_ik/resources/dynamic_vehicle_waypoint.txt");
+    std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_2_waypoint.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
@@ -753,7 +754,7 @@ void PointControl::publish() {
 
 void PointControl::Run() {
     if (!waypoint_stop) {
-        ReadCenterLine();  // not_waypoint_test
+        // ReadCenterLine();  // not_waypoint_test
     }
     if (global_planning) {
         purepursuit_next_point();
@@ -772,7 +773,7 @@ void PointControl::Run() {
 int main( int argc, char** argv ) {
     ros::init(argc, argv, "point_control");
     PointControl point_control;
-    // point_control.waypoint();  // waypoint_test
+    point_control.waypoint();  // waypoint_test
     // point_control.ReadCenterLine();
     ros::Rate loop_rate(30);  //1초에 30번
 

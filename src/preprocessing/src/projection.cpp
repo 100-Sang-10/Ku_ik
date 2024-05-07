@@ -68,8 +68,12 @@ void Projection::ObjectFitting(){
               double distance = sqrt(pow(xyz_point.x,2) + pow(xyz_point.y,2) + pow(xyz_point.z,2));
               fusion_msg.distance = distance;
               fusion_msg.Class = temp_name;
+              fusion_msg.toggle = true;
               std::cout << "fusion_msg.distance: " << fusion_msg.distance << std::endl;
               std::cout << "fusion_msg.Class: " << fusion_msg.Class << std::endl;
+            }
+            else{
+              fusion_msg.toggle = false;
             }
         }
 

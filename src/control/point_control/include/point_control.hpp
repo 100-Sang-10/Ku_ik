@@ -23,12 +23,16 @@
 
 #define SPEED_KPH  30
 #define sliding_window_dis 5.0
-#define init_position_x -138.765396118  // not_waypoint_test
-#define init_position_y 186.384170532  // not_waypoint_test
+// #define init_position_x -138.765396118  // not_waypoint_test
+// #define init_position_y 186.384170532  // not_waypoint_test
 // #define init_position_x 188.886138916  // not_waypoint_test
 // #define init_position_y -91.5933456421  // not_waypoint_test
 // #define init_position_x -54.9099540710449  // waypoint_test
 // #define init_position_y 77.2210540771484  // waypoint_test
+#define init_position_x -173.0  // waypoint_test
+#define init_position_y -84.5  // waypoint_test
+
+
 
 #define LOCAL_X                 0
 #define LOCAL_Y                 1
@@ -90,8 +94,8 @@ class PointControl {
 
     ros::Subscriber center_marker_sub;
     geometry_msgs::PoseArray center_points;
-    // bool global_planning = true;  // waypoint_test
-    bool global_planning = false;  // not_waypoint_test
+    bool global_planning = true;  // waypoint_test
+    // bool global_planning = false;  // not_waypoint_test
     bool waypoint_stop = false;
 
     double current_speed;                              // speedometer

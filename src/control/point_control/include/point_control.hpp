@@ -29,8 +29,8 @@
 // #define init_position_y -91.5933456421  // not_waypoint_test
 // #define init_position_x -54.9099540710449  // waypoint_test
 // #define init_position_y 77.2210540771484  // waypoint_test
-#define init_position_x -173.0  // waypoint_test
-#define init_position_y -84.5  // waypoint_test
+#define init_position_x -184.5  // waypoint_test
+#define init_position_y 63.0  // waypoint_test
 
 
 

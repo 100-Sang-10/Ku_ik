@@ -20,6 +20,7 @@ PointControl::PointControl() {
 void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
     fusion_msg = *obj_msg;
     bool object_callback = fusion_msg.toggle;
+    std::cout << "object_callback_bool: " << object_callback << std::endl;
     if (object_callback) {
         obeject_detection = true;
     }
@@ -82,7 +83,7 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
 void PointControl::waypoint() {
     // std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
     // std::ifstream in("/home/baek/git/Ku_ik/resources/dynamic_vehicle_waypoint.txt");
-    std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_2_waypoint.txt");
+    std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_3_waypoint.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
@@ -246,6 +247,10 @@ void PointControl::next_point() {
     }
 
     purepursuit_waypoint_count++;
+
+    if (purepursuit_waypoint_count == waypoint_vec.size()) {
+        purepursuit_waypoint_count = 0;
+    }
 }
 
 void PointControl::next_speed() {
@@ -265,7 +270,8 @@ void PointControl::next_speed() {
 
     velocity_container_count++;
     if (velocity_container_count >= velocity_vec.size()) {
-        target_speed_ms = 0;
+        // target_speed_ms = 0;
+        velocity_container_count = 0;
     }
 }
 
@@ -716,7 +722,7 @@ void PointControl::PedestrianStop() {
 }
 
 void PointControl::DynamicVehicleVelocity() {
-    if(dynamic_vehicle_distance < 20) {
+    if(0< dynamic_vehicle_distance && dynamic_vehicle_distance < 20) {
         accelerator = 0.0;
         if(dynamic_vehicle_distance < 10) {
             stop = 0.5;
@@ -737,12 +743,12 @@ void PointControl::Print() {
     // ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
     double target_speed_kph = target_speed_ms * 3.6;
     ROS_INFO("target_speed_kph = %f", target_speed_kph);
-    ROS_INFO("distance_a = %f", distance_a);
-    ROS_INFO("distance_b = %f", distance_b);
-    ROS_INFO("delivery_end = %i", delivery_end);
-    ROS_INFO("delivery_zone = %i", delivery_zone);
-    ROS_INFO("delivery_time = %i", delivery_time);
-    ROS_INFO("========================================");
+    // ROS_INFO("distance_a = %f", distance_a);
+    // ROS_INFO("distance_b = %f", distance_b);
+    // ROS_INFO("delivery_end = %i", delivery_end);
+    // ROS_INFO("delivery_zone = %i", delivery_zone);
+    // ROS_INFO("delivery_time = %i", delivery_time);
+    // ROS_INFO("========================================");
 }
 
 void PointControl::publish() {

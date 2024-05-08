@@ -47,65 +47,73 @@ void Projection::clustering_cb(const sensor_msgs::PointCloud2ConstPtr& msg){
 
 void Projection::ObjectFitting(){
     std::vector<detection_msgs::BoundingBox>::iterator itr;
-    for(itr = boundingbox_datas.begin(); itr != boundingbox_datas.end(); ++itr){
-        detection_msgs::BoundingBox temp_boundingbox;
-        temp_boundingbox = *itr;
-        std::string temp_name = temp_boundingbox.Class;
+    if(boundingbox_datas.size() != 0){
+      for(itr = boundingbox_datas.begin(); itr != boundingbox_datas.end(); ++itr){
+          detection_msgs::BoundingBox temp_boundingbox;
+          temp_boundingbox = *itr;
+          std::string temp_name = temp_boundingbox.Class;
 
-        int temp_xmin = temp_boundingbox.xmin;
-        int temp_xmax = temp_boundingbox.xmax;
-        int temp_ymin = temp_boundingbox.ymin;
-        int temp_ymax = temp_boundingbox.ymax;
+          int temp_xmin = temp_boundingbox.xmin;
+          int temp_xmax = temp_boundingbox.xmax;
+          int temp_ymin = temp_boundingbox.ymin;
+          int temp_ymax = temp_boundingbox.ymax;
 
-        for(auto itr = vec_uv.begin(); itr != vec_uv.end(); ++itr){
-            std::pair<cv::Point2i,pcl::PointXYZ> temp_point;
-            temp_point = *itr;
+          for(auto itr = vec_uv.begin(); itr != vec_uv.end(); ++itr){
+              std::pair<cv::Point2i,pcl::PointXYZ> temp_point;
+              temp_point = *itr;
 
-            cv::Point2i uv_point = temp_point.first;
-            pcl::PointXYZ xyz_point = temp_point.second;
+              cv::Point2i uv_point = temp_point.first;
+              pcl::PointXYZ xyz_point = temp_point.second;
 
-            if(temp_xmin <= uv_point.x && uv_point.x <= temp_xmax && temp_ymin <= uv_point.y && uv_point.y <= temp_ymax){
-              double distance = sqrt(pow(xyz_point.x,2) + pow(xyz_point.y,2) + pow(xyz_point.z,2));
-              fusion_msg.distance = distance;
-              fusion_msg.Class = temp_name;
-              fusion_msg.toggle = true;
-              std::cout << "fusion_msg.distance: " << fusion_msg.distance << std::endl;
-              std::cout << "fusion_msg.Class: " << fusion_msg.Class << std::endl;
-            }
-            else{
-              fusion_msg.toggle = false;
-            }
-        }
-
-        // 클러스터링된 모든 점을 이용해서 하려고 시도해본 거
-        /*
-        int point_number = 0;
-        int cluster_total_point = 0;
-        int prev_intensity = 1;
-
-        for(auto itr = projection_point.begin(); itr != projection_point.end(); ++itr){
-          std::pair<cv::Point2i, int> temp_projection_point;
-          temp_projection_point = *itr;
-          cv::Point2i uv_point = temp_projection_point.first;
-          int intensity = temp_projection_point.second;
-
-          if((intensity == prev_intensity) && (intensity > 0)){
-            cluster_total_point++;
-          
-            if(temp_xmin <= uv_point.x && uv_point.x <= temp_xmax && temp_ymin <= uv_point.y && uv_point.y <= temp_ymax){
-                point_number++; 
-            }
-            prev_intensity = intensity;
+              if(temp_xmin <= uv_point.x && uv_point.x <= temp_xmax && temp_ymin <= uv_point.y && uv_point.y <= temp_ymax){
+                double distance = sqrt(pow(xyz_point.x,2) + pow(xyz_point.y,2) + pow(xyz_point.z,2));
+                fusion_msg.distance = distance;
+                fusion_msg.Class = temp_name;
+                fusion_msg.toggle = true;
+                std::cout << "fusion_msg.distance: " << fusion_msg.distance << std::endl;
+                std::cout << "fusion_msg.Class: " << fusion_msg.Class << std::endl;
+              }
+              else{
+                fusion_msg.toggle = false;
+                fusion_msg.distance = -1;
+                fusion_msg.Class = "None";
+              }
           }
-        }
 
-        //threshold 설정
-        if(point_number > cluster_total_point * 0.8){
-          
-        }
-        */
+          // 클러스터링된 모든 점을 이용해서 하려고 시도해본 거
+          /*
+          int point_number = 0;
+          int cluster_total_point = 0;
+          int prev_intensity = 1;
+
+          for(auto itr = projection_point.begin(); itr != projection_point.end(); ++itr){
+            std::pair<cv::Point2i, int> temp_projection_point;
+            temp_projection_point = *itr;
+            cv::Point2i uv_point = temp_projection_point.first;
+            int intensity = temp_projection_point.second;
+
+            if((intensity == prev_intensity) && (intensity > 0)){
+              cluster_total_point++;
+            
+              if(temp_xmin <= uv_point.x && uv_point.x <= temp_xmax && temp_ymin <= uv_point.y && uv_point.y <= temp_ymax){
+                  point_number++; 
+              }
+              prev_intensity = intensity;
+            }
+          }
+
+          //threshold 설정
+          if(point_number > cluster_total_point * 0.8){
+            
+          }
+          */
+      }
     }
-    
+    else{
+      fusion_msg.toggle = false;
+      fusion_msg.distance = -1;
+      fusion_msg.Class = "None";
+    }
 }
 
 void Projection::LidarProjection(point cluster_data){

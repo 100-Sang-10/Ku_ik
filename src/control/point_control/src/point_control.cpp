@@ -247,10 +247,12 @@ void PointControl::next_point() {
     }
 
     purepursuit_waypoint_count++;
-
+    
+    // waypoint_test
     if (purepursuit_waypoint_count == waypoint_vec.size()) {
         purepursuit_waypoint_count = 0;
     }
+    // waypoint_test
 }
 
 void PointControl::next_speed() {
@@ -270,8 +272,8 @@ void PointControl::next_speed() {
 
     velocity_container_count++;
     if (velocity_container_count >= velocity_vec.size()) {
-        // target_speed_ms = 0;
-        velocity_container_count = 0;
+        // target_speed_ms = 0;  // not_waypoint_test
+        velocity_container_count = 0;  // waypoint_test
     }
 }
 
@@ -722,25 +724,30 @@ void PointControl::PedestrianStop() {
 }
 
 void PointControl::DynamicVehicleVelocity() {
-    if(0< dynamic_vehicle_distance && dynamic_vehicle_distance < 20) {
-        accelerator = 0.0;
-        if(dynamic_vehicle_distance < 10) {
-            stop = 0.5;
-        }
-        else if(dynamic_vehicle_distance < 5) {
-            stop = 1.0;
-        }
-        else {
-            stop = 0.0;
-            next_speed();
-        }
+    // if(0< dynamic_vehicle_distance && dynamic_vehicle_distance < 20) {
+    //     accelerator = 0.0;
+    //     if(dynamic_vehicle_distance < 10) {
+    //         stop = 0.5;
+    //     }
+    //     else if(dynamic_vehicle_distance < 5) {
+    //         stop = 1.0;
+    //     }
+    //     else {
+    //         stop = 0.0;
+    //         next_speed();
+    //     }
+    // }
+    // else if(dynamic_vehicle_distance > 20) {
+    //     accelerator += 0.1;
+    // }
+    // else{
+    //     next_speed();
+    // }
+    double speed = dynamic_vehicle_distance * FCA_DISTANCE;
+    if (speed > MAX_SPEED_KPH) {
+        speed = MAX_SPEED_KPH;
     }
-    else if(dynamic_vehicle_distance > 20) {
-        accelerator += 0.1;
-    }
-    else{
-        next_speed();
-    }
+    target_speed_ms = speed / 3.6;
 }
 
 void PointControl::Print() {

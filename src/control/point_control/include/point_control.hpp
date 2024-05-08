@@ -32,8 +32,6 @@
 #define init_position_x -184.5  // waypoint_test
 #define init_position_y 63.0  // waypoint_test
 
-
-
 #define LOCAL_X                 0
 #define LOCAL_Y                 1
 #define IDX_DIFF                20
@@ -42,6 +40,7 @@
 #define START_END_SPEED_KPH     20
 #define WINDOW_SIZE             10
 #define THRESHOLD_SIZE          1
+#define FCA_DISTANCE            1.5
 
 #define DELIVERY_STOP_DISTANCE  5.0
 #define A_ZONE_X                37.1479187012   // -77.0

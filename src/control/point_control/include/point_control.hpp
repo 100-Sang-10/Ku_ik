@@ -38,8 +38,8 @@
 #define LOCAL_Y                 1
 #define IDX_DIFF                20
 #define MAX_LATERAL_ACCEL_MS2   1.5  // 3.5
-#define MAX_SPEED_KPH           40
-#define START_END_SPEED_KPH     30
+#define MAX_SPEED_KPH           30
+#define START_END_SPEED_KPH     20
 #define WINDOW_SIZE             10
 #define THRESHOLD_SIZE          1
 

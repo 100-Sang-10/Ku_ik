@@ -732,10 +732,14 @@ void PointControl::DynamicVehicleVelocity() {
         }
         else {
             stop = 0.0;
+            next_speed();
         }
     }
     else if(dynamic_vehicle_distance > 20) {
         accelerator += 0.1;
+    }
+    else{
+        next_speed();
     }
 }
 

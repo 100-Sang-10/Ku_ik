@@ -771,7 +771,7 @@ void PointControl::publish() {
 
 void PointControl::Run() {
     if (!waypoint_stop) {
-        // ReadCenterLine();  // not_waypoint_test
+        ReadCenterLine();  // not_waypoint_test
     }
     if (global_planning) {
         purepursuit_next_point();
@@ -790,7 +790,7 @@ void PointControl::Run() {
 int main( int argc, char** argv ) {
     ros::init(argc, argv, "point_control");
     PointControl point_control;
-    point_control.waypoint();  // waypoint_test
+    // point_control.waypoint();  // waypoint_test
     // point_control.ReadCenterLine();
     ros::Rate loop_rate(30);  //1초에 30번
 

@@ -37,6 +37,7 @@ class Preprocessing{
     ros::Subscriber lidar_sub;
     ros::Publisher output_pub;
     ros::Publisher centroid_pub;
+    ros::Publisher right_pub;
 
     pcl::PointCloud<pcl::PointXYZ> cloud;
 
@@ -48,7 +49,6 @@ public:
     pcl::PointCloud<pcl::PointXYZ>::Ptr Voxel(pcl::PointCloud<pcl::PointXYZ> cloud);
     pcl::PointCloud<pcl::PointXYZ>::Ptr Ransac(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& filter_cloud);
     std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Clustering( pcl::PointCloud<pcl::PointXYZ>::Ptr& inlierPoint_neg);
-    
     void Object_detection();
 
 }; 

@@ -7,6 +7,7 @@ Preprocessing::Preprocessing(){
     lidar_sub = nh.subscribe("/carla/ego_vehicle/lidar",1, &Preprocessing::pointcloud_cb, this);
     output_pub = nh.advertise<sensor_msgs::PointCloud2>("clustering",1);
     centroid_pub = nh.advertise<sensor_msgs::PointCloud2>("centroid",1);
+    right_pub = nh.advertise<sensor_msgs::PointCloud2>("right_centroid",1);
 }
 
 //--------------------------------Downsampling(Voxelization)-----------------------------------------------
@@ -93,6 +94,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
 
   int j = 0;
   pcl::PointCloud<pcl::PointXYZ> centroid_cloud;
+  pcl::PointCloud<pcl::PointXYZ> right_cloud;
 
   for(auto it = cluster_indices.begin(); it != cluster_indices.end(); ++it){
     pcl::PointCloud<pcl::PointXYZI>::Ptr xyzi_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -100,7 +102,10 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
     double temp_x = 0;
     double temp_y = 0;
     double temp_z = 0;
+    double right_x,right_y,right_z = 0;
+    int right_count = 0;
     pcl::PointXYZ avg_point;
+    pcl::PointXYZ right_avg_point;
 
     for(auto pit = it -> indices.begin(); pit != it -> indices.end(); ++pit){
       pcl::PointXYZ pt = inlierPoints_neg->points[*pit];
@@ -108,6 +113,13 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
       pt2.x = pt.x;
       pt2.y = pt.y;
       pt2.z = pt.z;
+
+      if(pt.y < 0){
+        right_x += pt.x;
+        right_y += pt.y;
+        right_z += pt.z;
+        right_count++;
+      }
 
       temp_x += pt.x;
       temp_y += pt.y;
@@ -119,14 +131,22 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
     }
     
     j++;
-
+    
+    //클러스터링된 모든 물체의 평균점 1개
     avg_point.x = temp_x / it->indices.size();
     avg_point.y = temp_y / it->indices.size();
     avg_point.z = temp_z / it->indices.size();
 
+    //자차 기준 오른쪽에 있는 물체들의 평균점 1개
+    right_avg_point.x = right_x / right_count;
+    right_avg_point.y = right_y / right_count;
+    right_avg_point.z = right_z / right_count;
+
     centroid_cloud.push_back(avg_point);
     clusters.push_back(xyzi_cloud);
+    right_cloud.push_back(right_avg_point);
   }
+
   //클러스터링된 물체의 중점만 보내기
   sensor_msgs::PointCloud2 centroid_output;
   pcl::toROSMsg(centroid_cloud,centroid_output);
@@ -135,12 +155,15 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
   //클러스터링된 거 다 보내기
   pcl::PCLPointCloud2 cloud_p;
   pcl::toPCLPointCloud2(TotalCloud, cloud_p);
-  
   sensor_msgs::PointCloud2 output;
   pcl_conversions::fromPCL(cloud_p, output);
   output.header.frame_id = "ego_vehicle/lidar";
-
   output_pub.publish(output);
+
+  //오른쪽 물체의 중점 보내기
+  sensor_msgs::PointCloud2 right_output;
+  pcl::toROSMsg(right_cloud,right_output);
+  right_pub.publish(right_output);
 
   return clusters;
 }
@@ -163,7 +186,6 @@ void Preprocessing::Object_detection(){
   // filter_cloud = Voxel(total_cloud);
   // inlierPoints_neg = Ransac(filter_cloud);
   clusters = Clustering(center_ransac_cloud);
-  
 }
 
 int main(int argc, char ** argv){

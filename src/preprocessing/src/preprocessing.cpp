@@ -162,6 +162,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
 
   //오른쪽 물체의 중점 보내기
   sensor_msgs::PointCloud2 right_output;
+  right_output.header.frame_id = "ego_vehicle/lidar";
   pcl::toROSMsg(right_cloud,right_output);
   right_pub.publish(right_output);
 

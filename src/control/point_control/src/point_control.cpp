@@ -15,6 +15,7 @@ PointControl::PointControl() {
     center_marker_sub = nh.subscribe("/center_line_point", 100, &PointControl::OsmCallback, this);
 
     object_sub = nh.subscribe("/fusion_info", 100, &PointControl::ObjectCallback, this);
+    lattice_pub = nh.advertise<nav_msgs::Path>("/lattice_path",100);
 }
 
 void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
@@ -81,9 +82,9 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
 }
 
 void PointControl::waypoint() {
-    // std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
+    std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
     // std::ifstream in("/home/baek/git/Ku_ik/resources/dynamic_vehicle_waypoint.txt");
-    std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_3_waypoint.txt");
+    // std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_3_waypoint.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
@@ -245,14 +246,15 @@ void PointControl::next_point() {
 
         count++;
     }
+    // ROS_INFO("purepursuit_waypoint_count %i", purepursuit_waypoint_count);
 
     purepursuit_waypoint_count++;
     
-    // waypoint_test
-    if (purepursuit_waypoint_count == waypoint_vec.size()) {
-        purepursuit_waypoint_count = 0;
-    }
-    // waypoint_test
+    // // waypoint_test
+    // if (purepursuit_waypoint_count == waypoint_vec.size()) {
+    //     purepursuit_waypoint_count = 0;
+    // }
+    // // waypoint_test
 }
 
 void PointControl::next_speed() {
@@ -272,8 +274,8 @@ void PointControl::next_speed() {
 
     velocity_container_count++;
     if (velocity_container_count >= velocity_vec.size()) {
-        // target_speed_ms = 0;  // not_waypoint_test
-        velocity_container_count = 0;  // waypoint_test
+        target_speed_ms = 0;  // not_waypoint_test
+        // velocity_container_count = 0;  // waypoint_test
     }
 }
 
@@ -314,7 +316,7 @@ bool PointControl::DeliveryZone() {
 void PointControl::DeliveryStop() {
     if (delivery_zone) {
         target_speed_ms = 0.0;
-        if(current_speed == 0) {
+        if(current_speed < 0.1) {
             delivery_time = true;
         }
     }
@@ -750,16 +752,129 @@ void PointControl::DynamicVehicleVelocity() {
     target_speed_ms = speed / 3.6;
 }
 
+void PointControl::Dot(double result[3][1], double A[3][3], double B[3][1]) {
+    // int rows_A = A.size();
+    // int cols_A = A[0].size();
+    // int rows_B = B.size();
+    // int cols_B = B[0].size();
+
+    for (int i = 0; i < 3; ++i) {
+        result[i][0] = 0; // 결과 행렬의 각 요소 초기화
+        for (int k = 0; k < 3; ++k) {
+            result[i][0] += A[i][k] * B[k][0]; // 행렬 곱셈 수행
+        }
+    }
+}
+
+void PointControl::LatticePlanning() {
+    double global_ref_start_point_x = waypoint_vec[purepursuit_waypoint_count][0];
+    double global_ref_start_point_y = waypoint_vec[purepursuit_waypoint_count][1];
+    std::vector<double> global_ref_start_point;
+    global_ref_start_point.push_back(global_ref_start_point_x);
+    global_ref_start_point.push_back(global_ref_start_point_y);
+
+    double global_ref_start_next_point_x = waypoint_vec[purepursuit_waypoint_count+1][0];
+    double global_ref_start_next_point_y = waypoint_vec[purepursuit_waypoint_count+1][1];
+    std::vector<double> global_ref_start_next_point;
+    global_ref_start_next_point.push_back(global_ref_start_next_point_x);
+    global_ref_start_next_point.push_back(global_ref_start_next_point_y);
+
+    double global_ref_end_point_x = waypoint_vec[purepursuit_waypoint_count+(2 * Ld)][0];
+    double global_ref_end_point_y = waypoint_vec[purepursuit_waypoint_count+(2 * Ld)][1];
+    std::vector<double> global_ref_end_point;
+    global_ref_end_point.push_back(global_ref_end_point_x);
+    global_ref_end_point.push_back(global_ref_end_point_y);
+
+    double theta = atan2(global_ref_start_next_point[1] - global_ref_start_point[1], global_ref_start_next_point[0] - global_ref_start_point[0]);
+    double translation[] = {global_ref_start_point[0], global_ref_start_point[1]};
+    double trans_matrix[3][3] = {{cos(theta), -sin(theta), translation[0]},{sin(theta), cos(theta), translation[1]},{0, 0, 1}};
+    double det_trans_matrix[3][3] = {{trans_matrix[0][0], trans_matrix[1][0], -(trans_matrix[0][0] * translation[0] + trans_matrix[1][0] * translation[1])},
+                               {trans_matrix[0][1], trans_matrix[1][1], -(trans_matrix[0][1] * translation[0] + trans_matrix[1][1] * translation[1])},
+                               {0, 0, 1}};
+
+    double world_end_point[3][1] = {{global_ref_end_point[0]}, {global_ref_end_point[1]}, {1}};
+    double local_end_point[3][1];
+    Dot(local_end_point, det_trans_matrix, world_end_point);
+    // ROS_INFO("local_end_point = %f", local_end_point[0][0]);
+
+    double world_ego_vehicle_position[3][1] = {{ego_vehicle_x}, {ego_vehicle_y}, {1}};
+    double local_ego_vehicle_position[3][1];
+    Dot(local_ego_vehicle_position, det_trans_matrix, world_ego_vehicle_position);
+
+    std::vector<double> lane_off_set;
+    lane_off_set.insert(lane_off_set.end(), {-5, -4, -3.75, -2, 2, 3.75, 4, 5});  // TODO: tunning
+    std::vector<std::vector<double>> local_lattice_points;
+    for (int i = 0; i > lane_off_set.size(); i++) {
+        std::vector<double> vector;
+        vector.insert(vector.end(), {local_end_point[0][0], local_end_point[1][0] + lane_off_set[i], 1});
+        local_lattice_points.push_back(vector);
+    }
+
+    for(int i = 0; local_lattice_points.size(); i++) {
+        nav_msgs::Path lattice_path;
+        lattice_path.header.frame_id = "map";
+        std::vector<double> x;
+        std::vector<double> y;
+        double x_interval = 0.5;
+        double xf = local_lattice_points[i][0];
+        double ps = local_ego_vehicle_position[1][0];
+        double pf = local_lattice_points[i][1];
+        double x_num = xf / x_interval;
+
+        for (int j = 0; j > int(x_num); j++){
+            x.push_back(j*x_interval);
+        }
+
+        Eigen::VectorXf a(4);
+        a(0) = ps;
+        a(1) = 0;
+        a(2) = 3.0 * (pf - ps) / (xf * xf);
+        a(3) = -2.0 * (pf - ps) / (xf * xf * xf);
+
+        for (int j = 0; j > x.size(); j++){
+            double k = x[j];
+            double result = a(3) * k * k * k + a(2) * k * k + a(1) * k + a(0);
+            y.push_back(result);
+        }
+
+        for (int j = 0; j > y.size(); j++){
+            // Eigen::MatrixXf local_result(3,1);
+            // local_result = {{x[j]}, {y[j]}, {1}};
+            double local_result[3][1] = {{x[j]}, {y[j]}, {1}};
+            double global_result[3][1];
+            Dot(global_result, trans_matrix, local_result);
+            geometry_msgs::PoseStamped read_pose;
+            read_pose.pose.position.x = global_result[0][0];
+            read_pose.pose.position.y = global_result[1][0];
+            read_pose.pose.position.z = 0;
+            read_pose.pose.orientation.x = 0;
+            read_pose.pose.orientation.y = 0;
+            read_pose.pose.orientation.z = 0;
+            read_pose.pose.orientation.w = 1;
+            lattice_path.poses.push_back(read_pose);
+        }
+        out_path.push_back(lattice_path);
+    }
+}
+
+void PointControl::LatticeIndex() {
+    nav_msgs::Path lattice_path;
+    lattice_path = out_path[0];
+    lattice_pub.publish(lattice_path);
+}
+
 void PointControl::Print() {
     // ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
     double target_speed_kph = target_speed_ms * 3.6;
     ROS_INFO("target_speed_kph = %f", target_speed_kph);
     // ROS_INFO("distance_a = %f", distance_a);
     // ROS_INFO("distance_b = %f", distance_b);
+    // ROS_INFO("distance_c = %f", distance_c);
+    // ROS_INFO("distance_d = %f", distance_d);
     // ROS_INFO("delivery_end = %i", delivery_end);
     // ROS_INFO("delivery_zone = %i", delivery_zone);
     // ROS_INFO("delivery_time = %i", delivery_time);
-    // ROS_INFO("========================================");
+    ROS_INFO("========================================");
 }
 
 void PointControl::publish() {
@@ -767,6 +882,7 @@ void PointControl::publish() {
     mid_point_marker();
     purepursuit_point_marker();
     calc_sliding_window_error();
+    // LatticeIndex();
 }
 
 void PointControl::Run() {
@@ -782,6 +898,7 @@ void PointControl::Run() {
         if (obeject_detection) {
             ObjectDetection();
         }
+        // LatticePlanning();
         publish();
     }
     Print();

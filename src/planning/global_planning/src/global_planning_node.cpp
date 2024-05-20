@@ -109,7 +109,8 @@ class GlobalPlanning{
       m_candidate_path6.points.clear();
 
       // map = load("../Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
-      map = load("/home/baek/git/Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
+      // map = load("/home/baek/git/Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
+      map = load("/home/baek/git/Ku_ik/src/planning/global_planning/map/Town05_Final.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
       graph = routing::RoutingGraph::build(*map, *trafficRules);
     };
@@ -286,13 +287,13 @@ void GlobalPlanning::GetLanelet(Dst& to_address){
   switch (to_address.number)
     {
     case A :
-      to_address.lanelet = map->laneletLayer.get(649);   //A
+      to_address.lanelet = map->laneletLayer.get(649);  //A
       break;
     case B :
-      to_address.lanelet = map->laneletLayer.get(21496); //B
+      to_address.lanelet = map->laneletLayer.get(179);  //B //B' = 21496
       break;
     case C :
-      to_address.lanelet = map->laneletLayer.get(5797);  //C
+      to_address.lanelet = map->laneletLayer.get(299);  //C //C' = 5797
       break;
     case D :
       to_address.lanelet = map->laneletLayer.get(722);  //D

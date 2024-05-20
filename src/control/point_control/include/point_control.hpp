@@ -4,6 +4,7 @@
 #include <carla_msgs/CarlaEgoVehicleControl.h>
 #include <carla_msgs/CarlaEgoVehicleStatus.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <std_msgs/Float32.h>
 #include <iostream>
 #include <fstream>
@@ -20,6 +21,7 @@
 #include <chrono>
 #include <thread>
 #include <detection_msgs/SensorFusion.h>
+#include <eigen3/Eigen/Dense>
 
 #define SPEED_KPH  30
 #define sliding_window_dis 5.0
@@ -45,10 +47,10 @@
 #define DELIVERY_STOP_DISTANCE  5.0
 #define A_ZONE_X                37.1479187012   // -77.0
 #define A_ZONE_Y                35.9507026672   // 186.4
-#define B_ZONE_X                -196.809158325  // -10.0
-#define B_ZONE_Y                -43.3376693726  // 186.4
-#define C_ZONE_X                -156.98789978
-#define C_ZONE_Y                -96.6370849609
+#define B_ZONE_X                -133.051208496  // -10.0
+#define B_ZONE_Y                -47.4016838074  // 186.4
+#define C_ZONE_X                -90.6944885254
+#define C_ZONE_Y                -96.712928772
 #define D_ZONE_X                87.8212203979
 #define D_ZONE_Y                -86.132522583
 
@@ -120,6 +122,9 @@ class PointControl {
     double dynamic_vehicle_distance = 100;
     double prev_dynamic_vehicle_distance;
 
+    ros::Publisher lattice_pub;
+    std::vector<nav_msgs::Path> out_path;
+
   public:
     PointControl();
     void ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg);
@@ -159,6 +164,10 @@ class PointControl {
     void ObjectDetection();
     void PedestrianStop();
     void DynamicVehicleVelocity();
+
+    void Dot(double result[3][1], double A[3][3], double B[3][1]);
+    void LatticePlanning();
+    void LatticeIndex();
 
     void Print();
     void publish();

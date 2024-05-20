@@ -83,12 +83,6 @@ class GlobalPlanning{
     Dst m_address2;
     Dst m_address3;
 
-    Dst m_candidate_path1;
-    Dst m_candidate_path2;
-    Dst m_candidate_path3;
-    Dst m_candidate_path4;
-    Dst m_candidate_path5;
-    Dst m_candidate_path6;
   
 
   public:
@@ -100,13 +94,7 @@ class GlobalPlanning{
       vehicle_gnss_sub = nh.subscribe("/carla/ego_vehicle/gnss", 100, &GlobalPlanning::GNSSCallback, this);
       m_gnss_bool = false;
       m_init_bool = false;
-      
-      m_candidate_path1.points.clear();
-      m_candidate_path2.points.clear();
-      m_candidate_path3.points.clear();
-      m_candidate_path4.points.clear();
-      m_candidate_path5.points.clear();
-      m_candidate_path6.points.clear();
+    
 
       map = load("../Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
@@ -211,6 +199,20 @@ void GlobalPlanning::CalculatePath(){
   GetLanelet(m_address1);
   GetLanelet(m_address2);
   GetLanelet(m_address3);
+  // m_candidate_path1.points.clear();
+  // m_candidate_path2.points.clear();
+  // m_candidate_path3.points.clear();
+  // m_candidate_path4.points.clear();
+  // m_candidate_path5.points.clear();
+  // m_candidate_path6.points.clear();
+
+  Dst m_candidate_path1;
+  Dst m_candidate_path2;
+  Dst m_candidate_path3;
+  Dst m_candidate_path4;
+  Dst m_candidate_path5;
+  Dst m_candidate_path6;
+  m_paths_dist.clear();
   cout << " " << endl;
   cout <<"--------------------------------" << endl;
   CalculateShortPath(m_candidate_path1, m_spawn_lanelet, m_address1.lanelet, m_address2.lanelet, m_address3.lanelet); // 1 - 2 - 3
@@ -288,10 +290,10 @@ void GlobalPlanning::GetLanelet(Dst& to_address){
       to_address.lanelet = map->laneletLayer.get(649);   //A
       break;
     case B :
-      to_address.lanelet = map->laneletLayer.get(21496); //B
+      to_address.lanelet = map->laneletLayer.get(179); //B //B' = 21496
       break;
     case C :
-      to_address.lanelet = map->laneletLayer.get(5797);  //C
+      to_address.lanelet = map->laneletLayer.get(299);  //C //C' = 5797
       break;
     case D :
       to_address.lanelet = map->laneletLayer.get(722);  //D
@@ -391,11 +393,11 @@ void GlobalPlanning::VisualizeCenterLine(const vector<BasicPoint2d>& path_points
     marker.id = 0;
     marker.type = visualization_msgs::Marker::LINE_STRIP;
     marker.action = visualization_msgs::Marker::ADD;
-    marker.scale.x = 0.1; // 선의 두께
+    marker.scale.x = 0.5; // 선의 두께
 
     // 선 색상 설정 (R, G, B, A)
     marker.color.r = 1.0;
-    marker.color.g = 0.0;
+    marker.color.g = 0.3;
     marker.color.b = 0.0;
     marker.color.a = 1.0;
     marker.pose.orientation.w = 1.0 ;

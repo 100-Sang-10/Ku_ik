@@ -81,7 +81,7 @@ Visualization Manager:
       Marker Topic: /center_marker
       Name: Marker
       Namespaces:
-        {}
+        centerline: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -111,7 +111,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0.009999999776482582
+      Angle: 0
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -121,10 +121,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 2.9176464080810547
+      Scale: 2.45080828666687
       Target Frame: <Fixed Frame>
-      X: -26.119422912597656
-      Y: 23.80216407775879
+      X: -2.448172092437744
+      Y: -33.05032730102539
     Saved: ~
 Window Geometry:
   Displays:

@@ -1,0 +1,7 @@
+<launch>
+
+    <node pkg="preprocessing" type="preprocessing" name="preprocessing"  output="screen">
+  </node>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find preprocessing)/config/lidar.rviz" />
+</launch>

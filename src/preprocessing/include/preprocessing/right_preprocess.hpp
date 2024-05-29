@@ -1,5 +1,5 @@
-#ifndef PREPROCESSING_H
-#define PREPROCESSING_H
+#ifndef RIGHT_PREPROCESS_H
+#define RIGHT_PREPROCESS_H
 
 #include <iostream>
 #include <ros/ros.h>
@@ -32,28 +32,28 @@
 #include <pcl/common/transforms.h>
 #include <chrono>
 
+typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
-class Preprocessing{
+
+class RightPreprocess{
     ros::NodeHandle nh;
-    ros::Subscriber lidar_front_sub;
-    ros::Publisher output_pub;
-    ros::Publisher centroid_pub;
-    ros::Publisher rear_centroid_pub;
+    ros::Subscriber right_lidar_sub;
+    ros::Publisher right_output_pub;
 
-    pcl::PointCloud<pcl::PointXYZ> cloud;
+    PointCloud raw_cloud;
+    PointCloud object_cloud;
 
 public:
-    Preprocessing();
+    RightPreprocess();
+    ~RightPreprocess();
 
-    void pointcloud_front_cb(const sensor_msgs::PointCloud2ConstPtr& pointcloud_msg);
+    void right_cb(const sensor_msgs::PointCloud2ConstPtr msg);
+    void Run();
+    PointCloud::Ptr Voxel(PointCloud cloud);
+    std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Clustering(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr Voxel(pcl::PointCloud<pcl::PointXYZ> cloud);
+};
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr Ransac(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& filter_cloud);
-    std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Clustering( pcl::PointCloud<pcl::PointXYZ>::Ptr& inlierPoint_neg);
-    void Object_detection();
 
-}; 
 
 #endif
-

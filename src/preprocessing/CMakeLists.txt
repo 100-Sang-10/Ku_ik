@@ -136,6 +136,12 @@ target_link_libraries(projection
   ${catkin_LIBRARIES}
 )
 
+add_executable(right_preprocess src/right_preprocess.cpp)
+add_dependencies(right_preprocess ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(right_preprocess
+  ${catkin_LIBRARIES}
+)
+
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
   # src/${PROJECT_NAME}/preprocessing.cpp

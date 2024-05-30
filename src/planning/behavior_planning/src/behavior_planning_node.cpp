@@ -6,6 +6,7 @@
 
 #include "geometry_msgs/Point.h"
 #include "nav_msgs/Odometry.h"
+#include "detection_msgs/SensorFusion.h"
 
 #include "pcl/point_cloud.h"
 #include <pcl_conversions/pcl_conversions.h>
@@ -16,11 +17,14 @@
 #define WAIT_MOVING_LEFT      71
 #define MOVING_LEFT_LANE      72
 #define OVERTAKE              73
-#define MOVING_RIGHT_LANE     74
+#define WAIT_MOVING_RIGHT     74
+#define MOVING_RIGHT_LANE     75
 
-#define LANE_CHANGE_OFFSET_IDX      30
-#define LANE_ERROR_DISTANCE_MAX     20
-#define LANE_ERROR_DISTANCE_MIN     15
+
+#define LANE_CHANGE_RIGHT_OFFSET    -2.5
+#define LANE_CHANGE_LEFT_OFFSET     2.5
+#define LANE_ERROR_DISTANCE_MAX     18
+#define LANE_ERROR_DISTANCE_MIN     10
 
 using namespace std;
 
@@ -30,38 +34,47 @@ class SetStateAndPub{
         ros::NodeHandle nh;
         ros::Subscriber vehicle_stat_sub;
         ros::Subscriber vehicle_odom_sub;
-        ros::Subscriber obstacle_pos;
+        ros::Subscriber front_obstacle_pos;
+        ros::Subscriber right_obstacle_pos;
 
         carla_msgs::CarlaEgoVehicleStatus ego_vehicle_status;
         nav_msgs::Odometry ego_vehicle_odom;
-        pcl::PointCloud<pcl::PointXYZ> obstacle_position;
-
+        nav_msgs::Odometry prev_vehicle_odom;
+        pcl::PointCloud<pcl::PointXYZ> right_obstacle;
+        
         int state;
         string state_name;
         int ego_vehicle_lane_before;
         int ego_vehicle_lane_now = 3;
         int temp_state;
         
-    
-        double distance_with_front_obstacle = 9999.;
+        double right_obstacle_x = -1;
+        double right_obstacle_y = -1;
+        double right_obstacle_z;
+        double lane_change_thre ;
 
+        double distance_with_front_obstacle = 9999.;
+        double distance_with_right_obstacle = 9999.;
+
+        string vehicle_class;
+        
         bool local_planning;
         bool lane_change;
         bool vehicle_in_front;
         bool vehicle_in_left;
         bool vehicle_in_right;
-        bool fast_vehicle_in_left;
         bool fast_vehicle_in_right;
 
     public:
         SetStateAndPub(){
             vehicle_stat_sub = nh.subscribe("/carla/ego_vehicle/vehicle_status", 100, &SetStateAndPub::VehicleStatusCallback, this);
             vehicle_odom_sub = nh.subscribe("/carla/ego_vehicle/odometry", 100, &SetStateAndPub::GNSSCallback, this);
-            obstacle_pos = nh.subscribe("centroid", 100, &SetStateAndPub::ObstaclePosCallback, this);
+            front_obstacle_pos = nh.subscribe("/fusion_info", 100, &SetStateAndPub::FObstaclePosCallback, this);
+            right_obstacle_pos = nh.subscribe("/right_output", 100, &SetStateAndPub::RObstaclePosCallback, this);
             state = GLOBAL_PATH_FOLLOW;
             local_planning = false;
             vehicle_in_front = false;
-            fast_vehicle_in_left = false;
+            
             fast_vehicle_in_right = false;
             vehicle_in_left = false;
             vehicle_in_right = false;
@@ -71,55 +84,85 @@ class SetStateAndPub{
 
         void GNSSCallback(const nav_msgs::Odometry::ConstPtr& odom_msg);
         void VehicleStatusCallback(const carla_msgs::CarlaEgoVehicleStatus::ConstPtr& msg);
-        void ObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg);
+        void FObstaclePosCallback(const detection_msgs::SensorFusion::ConstPtr& pos_msg);
+        void RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg);
         void SetState();
         bool LaneChanged();
         void Print();
 };
 
-void SetStateAndPub::ObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg){
+void SetStateAndPub::FObstaclePosCallback(const detection_msgs::SensorFusion::ConstPtr& pos_msg){
 
-    pcl::fromROSMsg(*pos_msg, obstacle_position);
+    vehicle_class = pos_msg->Class;
+    distance_with_front_obstacle = pos_msg->distance;
+    
+ 
+    if(distance_with_front_obstacle == -1){
+        vehicle_in_front = false;
+    }                                 
+    else{
+        vehicle_in_front = true;
+    }   
+}
 
-    cout << "---------------" << endl;
-    for(int index = 0 ; index < obstacle_position.size() ; index++){
+void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg){
+    pcl::fromROSMsg(*pos_msg, right_obstacle);
 
-        if(!obstacle_position.empty()){
-            if( obstacle_position[index].y > -1. && obstacle_position[index].y < 1. &&  obstacle_position[index].x > 0){
+    for(int index = 0 ; index < right_obstacle.size() ; index++){
 
-                cout << "obstacle x : " << obstacle_position[index].x << endl;
-                cout << "obstacle y : " << obstacle_position[index].y << endl;
-                cout << "obstacle z : " << obstacle_position[index].z << endl;
-                distance_with_front_obstacle = sqrt(pow(obstacle_position[index].x, 2) 
-                                                + pow(obstacle_position[index].y, 2));
-                cout << "Distance with front Obstacle : " << distance_with_front_obstacle << "(m)" <<endl;
+        if(!right_obstacle.empty()){
+            if(right_obstacle[index].y > -1.3){
+
+                distance_with_right_obstacle = sqrt(pow(right_obstacle[index].x, 2)
+                                                + pow(right_obstacle[index].y, 2));
+                right_obstacle_x = right_obstacle[index].x;
+                right_obstacle_y = right_obstacle[index].y;
+                right_obstacle_z = right_obstacle[index].z;
                 
-                vehicle_in_front = true;
+                vehicle_in_right = true;
             }
             else{
-                vehicle_in_front = false;
+                vehicle_in_right = false;
             }
         }
         else{
-            vehicle_in_front = false;
+            vehicle_in_right = false;
         }
 
     }
-                                        
-    
+                   
 
 }
+
 
 void SetStateAndPub::GNSSCallback(const nav_msgs::Odometry::ConstPtr& odom_msg){
 
     ego_vehicle_odom.pose.pose.position.x = odom_msg->pose.pose.position.x;
     ego_vehicle_odom.pose.pose.position.y = odom_msg->pose.pose.position.y;
     ego_vehicle_odom.pose.pose.position.z = odom_msg->pose.pose.position.z;
-    
-    // cout << "---------------------------------" << endl;
-    // cout << "ego vehicle X : " << ego_vehicle_odom.pose.pose.position.x << endl;
-    // cout << "ego vehicle Y : " << ego_vehicle_odom.pose.pose.position.y << endl;
-    // cout << "ego vehicle Z : " << ego_vehicle_odom.pose.pose.position.z << endl;
+
+    if(state_name == "WAIT_MOVING_LEFT"){
+        prev_vehicle_odom = ego_vehicle_odom;
+    }
+    if(state_name == "MOVING_LEFT_LANE"){
+        lane_change_thre = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
+        if(lane_change_thre > LANE_CHANGE_LEFT_OFFSET){
+            lane_change = true;
+        }
+        
+    }
+    if(state_name == "WAIT_MOVING_RIGHT"){
+        prev_vehicle_odom = ego_vehicle_odom;
+    }
+    if(state_name == "MOVING_RIGHT_LANE"){
+        lane_change_thre = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
+        if(lane_change_thre < LANE_CHANGE_RIGHT_OFFSET){
+            lane_change = true;
+        }
+    }
+         
+                               
+                               
 
 }
 
@@ -130,30 +173,17 @@ void SetStateAndPub::VehicleStatusCallback(const carla_msgs::CarlaEgoVehicleStat
     ego_vehicle_status.orientation = msg->orientation;
     ego_vehicle_status.control = msg->control;
 
-    // cout << ego_vehicle_status << endl;
-    
 }
 
 void SetStateAndPub::SetState() {
     
-    // bool lane_change = LaneChanged();
-
-    // if(traffic_sign == true){
-    //     local_planning = true;
-    //     state = RED_TRAFFIC_SIGN;
-    // }
-
-    // else if(traffic_sign == false){
-    //     if(state == RED_TRAFFIC_SIGN){
-    //         state = temp_state;
-    //     }
 
     switch (state) {
         case GLOBAL_PATH_FOLLOW : 
             local_planning = false;
             state_name = "GLOBAL_PATH_FOLLOW";
 
-            if (vehicle_in_front == true  && (distance_with_front_obstacle <= LANE_ERROR_DISTANCE_MAX && distance_with_front_obstacle >= LANE_ERROR_DISTANCE_MIN)){
+            if (vehicle_class == "vehicle" && (distance_with_front_obstacle <= LANE_ERROR_DISTANCE_MAX && distance_with_front_obstacle >= LANE_ERROR_DISTANCE_MIN)){
                 state = WAIT_MOVING_LEFT;
                 temp_state = state;
             }
@@ -162,7 +192,8 @@ void SetStateAndPub::SetState() {
         case WAIT_MOVING_LEFT :
             local_planning = true;
             state_name = "WAIT_MOVING_LEFT";
-            if ((vehicle_in_left == false) && (fast_vehicle_in_left == false) && (ego_vehicle_lane_now != 1)) {
+            
+            if ((vehicle_in_left == false) && (ego_vehicle_lane_now != 1)) {
                 state = MOVING_LEFT_LANE; 
                 temp_state = state;
             }
@@ -176,9 +207,11 @@ void SetStateAndPub::SetState() {
             //     state = WAIT_OVERTAKE;
             //     temp_state = state;
             // }
-                if (vehicle_in_front == false && lane_change == true) {
+            if (vehicle_in_front == false && lane_change == true) {
                 state = OVERTAKE;
                 temp_state = state;
+                lane_change = false;
+                lane_change_thre = 0;
             }
             break;
 
@@ -186,28 +219,40 @@ void SetStateAndPub::SetState() {
             local_planning = true;
             state_name = "OVERTAKE";
             if ((vehicle_in_right == false) && (fast_vehicle_in_right == false)) {
-                state = MOVING_RIGHT_LANE;
+                state = WAIT_MOVING_RIGHT;
                 temp_state = state; 
             }
             break;
+            
+          case WAIT_MOVING_RIGHT :
+            local_planning = true;
+            state_name = "WAIT_MOVING_RIGHT";
+            
+            if ((vehicle_in_right == false)) {
+                state = MOVING_RIGHT_LANE; 
+                temp_state = state;
+            }
+            break;
+
+
 
         case MOVING_RIGHT_LANE :
             local_planning = true;
             state_name = "MOVING_RIGHT_LANE";
             if (lane_change == true) {
-                if (ego_vehicle_lane_now == 4) {
                     state = GLOBAL_PATH_FOLLOW;
                     temp_state = state;
+                    lane_change = false;
                 }
-                else {
-                    state = OVERTAKE;
-                    temp_state = state;
-                }
+            else {
+                state = OVERTAKE;
+                temp_state = state;
             }
+            
             break;
     }
     // }
-    Print();
+
 }
 
 bool SetStateAndPub::LaneChanged() {
@@ -224,7 +269,18 @@ bool SetStateAndPub::LaneChanged() {
 
 void SetStateAndPub::Print(){
     
+    cout << "---------------" << endl;
+    cout << "Vehicle X : " << ego_vehicle_odom.pose.pose.position.x << endl;
+    cout << "Vehicle Y : " << ego_vehicle_odom.pose.pose.position.y << endl;
+    cout << "---------------" << endl;
+    cout << "Class :" << vehicle_class << endl;
+    cout << "Distance :" << distance_with_front_obstacle << endl;
     cout << "State : " << state_name << endl;
+    cout << "obstacle x : " << right_obstacle_x << endl;
+    cout << "obstacle y : " << right_obstacle_y << endl;
+    cout << "Distance with front Obstacle : " << distance_with_right_obstacle << "(m)" <<endl;
+    cout << "lane_change : " << lane_change_thre << endl;
+                
 }
 
 int main(int argc, char ** argv){
@@ -238,6 +294,7 @@ int main(int argc, char ** argv){
   while(ros::ok()){
     
     set.SetState();
+    set.Print();
     ros::spinOnce();
     loop_rate.sleep();
     

@@ -11,4 +11,8 @@ gnome-terminal -- bash -c "cd /home/eonsoo/carla-ros-bridge && roslaunch carla_r
 
 sleep 3
 
-gnome-terminal -- bash -c "roslaunch preprocessing Lidar.launch"
+gnome-terminal -- bash -c "roslaunch preprocessing Lidar.launch"&
+
+sleep 3
+
+gnome-terminal -- bash -c "rosrun preprocessing right_preprocess"

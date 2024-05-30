@@ -111,7 +111,7 @@ void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstP
     for(int index = 0 ; index < right_obstacle.size() ; index++){
 
         if(!right_obstacle.empty()){
-            if(right_obstacle[index].y > -1.3){
+            if(right_obstacle[index].y < -1.3){
 
                 distance_with_right_obstacle = sqrt(pow(right_obstacle[index].x, 2)
                                                 + pow(right_obstacle[index].y, 2));
@@ -120,6 +120,9 @@ void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstP
                 right_obstacle_z = right_obstacle[index].z;
                 
                 vehicle_in_right = true;
+                if(distance_with_right_obstacle > 5.0){
+                       vehicle_in_right = false;
+                }
             }
             else{
                 vehicle_in_right = false;
@@ -218,7 +221,7 @@ void SetStateAndPub::SetState() {
         case OVERTAKE :
             local_planning = true;
             state_name = "OVERTAKE";
-            if ((vehicle_in_right == false) && (fast_vehicle_in_right == false)) {
+            if ((vehicle_in_right == false)) {
                 state = WAIT_MOVING_RIGHT;
                 temp_state = state; 
             }

@@ -4,13 +4,15 @@
 
 Preprocessing::Preprocessing(){
 
-    lidar_sub = nh.subscribe("/carla/ego_vehicle/lidar",1, &Preprocessing::pointcloud_cb, this);
+    lidar_front_sub = nh.subscribe("/carla/ego_vehicle/lidar_front",1, &Preprocessing::pointcloud_front_cb, this);
     output_pub = nh.advertise<sensor_msgs::PointCloud2>("clustering",1);
     centroid_pub = nh.advertise<sensor_msgs::PointCloud2>("centroid",1);
+    rear_centroid_pub = nh.advertise<sensor_msgs::PointCloud2>("rear_centroid",1);
 }
 
 //--------------------------------Downsampling(Voxelization)-----------------------------------------------
 pcl::PointCloud<pcl::PointXYZ>::Ptr Preprocessing::Voxel(pcl::PointCloud<pcl::PointXYZ> cloud){
+
   for(unsigned int i = 0; i < cloud.points.size();i++){
     if(cloud.points[i].z > -0.38 || cloud.points[i].y > 5 || cloud.points[i].y < -5){
       cloud.points[i].x = 0;
@@ -32,8 +34,10 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Preprocessing::Voxel(pcl::PointCloud<pcl::Po
   vg.setLeafSize(0.2,0.2,0.2);
   vg.filter(*filter_cloud);
   // std::cout << "downsampled cloud size: " << filter_cloud ->points.size() << std::endl;
+
   return filter_cloud;
 }
+
 // ------------------------------------------------Ransac---------------------------------------------------------
 pcl::PointCloud<pcl::PointXYZ>::Ptr Preprocessing::Ransac(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& filter_cloud){
 
@@ -93,6 +97,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
 
   int j = 0;
   pcl::PointCloud<pcl::PointXYZ> centroid_cloud;
+  pcl::PointCloud<pcl::PointXYZ> right_cloud;
 
   for(auto it = cluster_indices.begin(); it != cluster_indices.end(); ++it){
     pcl::PointCloud<pcl::PointXYZI>::Ptr xyzi_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -119,7 +124,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
     }
     
     j++;
-
+    
+    //클러스터링된 모든 물체의 평균점 1개
     avg_point.x = temp_x / it->indices.size();
     avg_point.y = temp_y / it->indices.size();
     avg_point.z = temp_z / it->indices.size();
@@ -127,43 +133,56 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Preprocessing::Clustering(pcl:
     centroid_cloud.push_back(avg_point);
     clusters.push_back(xyzi_cloud);
   }
+
   //클러스터링된 물체의 중점만 보내기
   sensor_msgs::PointCloud2 centroid_output;
   pcl::toROSMsg(centroid_cloud,centroid_output);
+  centroid_output.header.frame_id = "ego_vehicle/lidar_front";
   centroid_pub.publish(centroid_output);
 
   //클러스터링된 거 다 보내기
   pcl::PCLPointCloud2 cloud_p;
   pcl::toPCLPointCloud2(TotalCloud, cloud_p);
-  
   sensor_msgs::PointCloud2 output;
   pcl_conversions::fromPCL(cloud_p, output);
-  output.header.frame_id = "ego_vehicle/lidar";
-
+  output.header.frame_id = "ego_vehicle/lidar_front";
   output_pub.publish(output);
+
 
   return clusters;
 }
 
 
-void Preprocessing::pointcloud_cb(const sensor_msgs::PointCloud2ConstPtr& pcl_msg){  
+void Preprocessing::pointcloud_front_cb(const sensor_msgs::PointCloud2ConstPtr& pcl_msg){  
   pcl::fromROSMsg(*pcl_msg, cloud);
 }
 
+
 void Preprocessing::Object_detection(){
-  cloud.header.frame_id = "ego_vehicle/lidar";
+  cloud.header.frame_id = "ego_vehicle/lidar_front";
+
+  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+  // std::cout << "start_time: " << start_time << std::endl;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr center_voxel_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   center_voxel_cloud = Voxel(cloud);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr center_ransac_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   center_ransac_cloud = Ransac(center_voxel_cloud);
-  
+
   std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> clusters;
   // filter_cloud = Voxel(total_cloud);
   // inlierPoints_neg = Ransac(filter_cloud);
   clusters = Clustering(center_ransac_cloud);
-  
+
+  std::chrono::duration<double> processing_time = std::chrono::system_clock::now() - start_time;
+  // std::cout << "end_time: " << end_time << std::endl;
+  std::cout << "processing_time: " << processing_time.count() << std::endl;
+
+  // std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> right_clusters;
+  // filter_cloud = Voxel(total_cloud);
+  // inlierPoints_neg = Ransac(filter_cloud);
+  // right_clusters = Clustering(right_ransac_cloud);
 }
 
 int main(int argc, char ** argv){
@@ -182,5 +201,3 @@ int main(int argc, char ** argv){
   }
 
 }
-
-

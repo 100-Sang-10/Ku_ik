@@ -21,7 +21,7 @@
 #include <WGS84toCartesian.hpp>
 
 #define LOOK_AHEAD_DISTANCE 2
-#define TARGET_SPEED_KPH  10
+#define TARGET_SPEED_KPH  15
 #define init_position_x -132.0
 #define init_position_y  14.5
 

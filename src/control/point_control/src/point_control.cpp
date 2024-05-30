@@ -21,7 +21,7 @@ PointControl::PointControl() {
 void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
     fusion_msg = *obj_msg;
     bool object_callback = fusion_msg.toggle;
-    std::cout << "object_callback_bool: " << object_callback << std::endl;
+    // std::cout << "object_callback_bool: " << object_callback << std::endl;
     if (object_callback) {
         obeject_detection = true;
     }
@@ -874,7 +874,7 @@ void PointControl::Print() {
     // ROS_INFO("delivery_end = %i", delivery_end);
     // ROS_INFO("delivery_zone = %i", delivery_zone);
     // ROS_INFO("delivery_time = %i", delivery_time);
-    ROS_INFO("========================================");
+    // ROS_INFO("========================================");
 }
 
 void PointControl::publish() {

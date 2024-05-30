@@ -30,25 +30,27 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <pcl/common/transforms.h>
+#include <chrono>
 
 
 class Preprocessing{
     ros::NodeHandle nh;
-    ros::Subscriber lidar_sub;
+    ros::Subscriber lidar_front_sub;
     ros::Publisher output_pub;
     ros::Publisher centroid_pub;
+    ros::Publisher rear_centroid_pub;
 
     pcl::PointCloud<pcl::PointXYZ> cloud;
 
 public:
     Preprocessing();
 
-    void pointcloud_cb(const sensor_msgs::PointCloud2ConstPtr& pointcloud_msg);
+    void pointcloud_front_cb(const sensor_msgs::PointCloud2ConstPtr& pointcloud_msg);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr Voxel(pcl::PointCloud<pcl::PointXYZ> cloud);
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr Ransac(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& filter_cloud);
     std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> Clustering( pcl::PointCloud<pcl::PointXYZ>::Ptr& inlierPoint_neg);
-    
     void Object_detection();
 
 }; 

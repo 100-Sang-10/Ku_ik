@@ -7,6 +7,7 @@
 #include "geometry_msgs/Point.h"
 #include "nav_msgs/Odometry.h"
 #include "detection_msgs/SensorFusion.h"
+#include "std_msgs/Int64.h"
 
 #include "pcl/point_cloud.h"
 #include <pcl_conversions/pcl_conversions.h>
@@ -21,8 +22,8 @@
 #define MOVING_RIGHT_LANE     75
 
 
-#define LANE_CHANGE_RIGHT_OFFSET    -2.5
-#define LANE_CHANGE_LEFT_OFFSET     2.5
+#define LANE_CHANGE_RIGHT_OFFSET    -2.8
+#define LANE_CHANGE_LEFT_OFFSET     2.8
 #define LANE_ERROR_DISTANCE_MAX     18
 #define LANE_ERROR_DISTANCE_MIN     10
 
@@ -36,6 +37,7 @@ class SetStateAndPub{
         ros::Subscriber vehicle_odom_sub;
         ros::Subscriber front_obstacle_pos;
         ros::Subscriber right_obstacle_pos;
+        ros::Publisher state_pub;
 
         carla_msgs::CarlaEgoVehicleStatus ego_vehicle_status;
         nav_msgs::Odometry ego_vehicle_odom;
@@ -43,6 +45,7 @@ class SetStateAndPub{
         pcl::PointCloud<pcl::PointXYZ> right_obstacle;
         
         int state;
+        std_msgs::Int64 state_number;
         string state_name;
         int ego_vehicle_lane_before;
         int ego_vehicle_lane_now = 3;
@@ -51,7 +54,8 @@ class SetStateAndPub{
         double right_obstacle_x = -1;
         double right_obstacle_y = -1;
         double right_obstacle_z;
-        double lane_change_thre ;
+        double lane_change_thre_l;
+        double lane_change_thre_r;
 
         double distance_with_front_obstacle = 9999.;
         double distance_with_right_obstacle = 9999.;
@@ -71,6 +75,9 @@ class SetStateAndPub{
             vehicle_odom_sub = nh.subscribe("/carla/ego_vehicle/odometry", 100, &SetStateAndPub::GNSSCallback, this);
             front_obstacle_pos = nh.subscribe("/fusion_info", 100, &SetStateAndPub::FObstaclePosCallback, this);
             right_obstacle_pos = nh.subscribe("/right_output", 100, &SetStateAndPub::RObstaclePosCallback, this);
+
+            state_pub = nh.advertise<std_msgs::Int64>("/state", 1000);
+
             state = GLOBAL_PATH_FOLLOW;
             local_planning = false;
             vehicle_in_front = false;
@@ -107,7 +114,6 @@ void SetStateAndPub::FObstaclePosCallback(const detection_msgs::SensorFusion::Co
 
 void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg){
     pcl::fromROSMsg(*pos_msg, right_obstacle);
-
     for(int index = 0 ; index < right_obstacle.size() ; index++){
 
         if(!right_obstacle.empty()){
@@ -119,9 +125,11 @@ void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstP
                 right_obstacle_y = right_obstacle[index].y;
                 right_obstacle_z = right_obstacle[index].z;
                 
-                vehicle_in_right = true;
-                if(distance_with_right_obstacle > 5.0){
-                       vehicle_in_right = false;
+                if(distance_with_right_obstacle > 10.0){
+                    vehicle_in_right = false;
+                }
+                else{
+                    vehicle_in_right = true;
                 }
             }
             else{
@@ -148,8 +156,8 @@ void SetStateAndPub::GNSSCallback(const nav_msgs::Odometry::ConstPtr& odom_msg){
         prev_vehicle_odom = ego_vehicle_odom;
     }
     if(state_name == "MOVING_LEFT_LANE"){
-        lane_change_thre = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
-        if(lane_change_thre > LANE_CHANGE_LEFT_OFFSET){
+        lane_change_thre_l = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
+        if(lane_change_thre_l > LANE_CHANGE_LEFT_OFFSET){
             lane_change = true;
         }
         
@@ -158,8 +166,8 @@ void SetStateAndPub::GNSSCallback(const nav_msgs::Odometry::ConstPtr& odom_msg){
         prev_vehicle_odom = ego_vehicle_odom;
     }
     if(state_name == "MOVING_RIGHT_LANE"){
-        lane_change_thre = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
-        if(lane_change_thre < LANE_CHANGE_RIGHT_OFFSET){
+        lane_change_thre_r = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
+        if(lane_change_thre_r < LANE_CHANGE_RIGHT_OFFSET){
             lane_change = true;
         }
     }
@@ -214,7 +222,7 @@ void SetStateAndPub::SetState() {
                 state = OVERTAKE;
                 temp_state = state;
                 lane_change = false;
-                lane_change_thre = 0;
+                lane_change_thre_l = 0;
             }
             break;
 
@@ -246,15 +254,18 @@ void SetStateAndPub::SetState() {
                     state = GLOBAL_PATH_FOLLOW;
                     temp_state = state;
                     lane_change = false;
-                }
-            else {
-                state = OVERTAKE;
-                temp_state = state;
+                    lane_change_thre_l = 0;
             }
+            // else {
+            //     state = OVERTAKE;
+            //     temp_state = state;
+            // }
             
             break;
     }
     // }
+    state_number.data = state;
+    state_pub.publish(state_number);
 
 }
 
@@ -276,13 +287,17 @@ void SetStateAndPub::Print(){
     cout << "Vehicle X : " << ego_vehicle_odom.pose.pose.position.x << endl;
     cout << "Vehicle Y : " << ego_vehicle_odom.pose.pose.position.y << endl;
     cout << "---------------" << endl;
+    cout << "State : " << state_name << endl;
+    cout << "---------------" << endl;
     cout << "Class :" << vehicle_class << endl;
     cout << "Distance :" << distance_with_front_obstacle << endl;
-    cout << "State : " << state_name << endl;
-    cout << "obstacle x : " << right_obstacle_x << endl;
-    cout << "obstacle y : " << right_obstacle_y << endl;
-    cout << "Distance with front Obstacle : " << distance_with_right_obstacle << "(m)" <<endl;
-    cout << "lane_change : " << lane_change_thre << endl;
+    cout << "Distance with front Obstacle : " << distance_with_front_obstacle << "(m)" <<endl;
+    cout << "---------------" << endl;
+    cout << "Right obstacle x : " << right_obstacle_x << endl;
+    cout << "Right obstacle y : " << right_obstacle_y << endl;
+    cout << "Distance with right Obstacle : " << distance_with_right_obstacle << "(m)" <<endl;
+    cout << "lane_change_l : " << lane_change_thre_l  << endl;
+    cout << "lane_change_r : " << lane_change_thre_r  << endl;
                 
 }
 

@@ -9,10 +9,26 @@ PointControl::PointControl() {
     sub_midpoint = nh.subscribe("/mid_point", 100, &PointControl::point_Callback, this);
     point_pub = nh.advertise<visualization_msgs::Marker>("/point_marker", 100);
     purepursuit_point_pub = nh.advertise<visualization_msgs::Marker>("/purepursuit_point_marker", 100);
-    sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
+    // sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
     sliding_window_error_pub = nh.advertise<std_msgs::Float32>("/sliding_window_error",100);
 
     center_marker_sub = nh.subscribe("/center_line_point", 100, &PointControl::OsmCallback, this);
+
+    object_sub = nh.subscribe("/fusion_info", 100, &PointControl::ObjectCallback, this);
+    lattice_pub = nh.advertise<nav_msgs::Path>("/lattice_path",100);
+    sub_avoid_state = nh.subscribe("/state", 100, &PointControl::AvoidStateCallback, this);
+}
+
+void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
+    fusion_msg = *obj_msg;
+    bool object_callback = fusion_msg.toggle;
+    // std::cout << "object_callback_bool: " << object_callback << std::endl;
+    if (object_callback) {
+        obeject_detection = true;
+    }
+    else {
+        obeject_detection = false;
+    }
 }
 
 void PointControl::OsmCallback(const geometry_msgs::PoseArray::ConstPtr& center_line_msg){
@@ -68,6 +84,8 @@ std::vector<double> PointControl::WGS84toCartesian(double input_lat, double inpu
 
 void PointControl::waypoint() {
     std::ifstream in("/home/baek/git/Ku_ik/resources/waypoint_center.txt");
+    // std::ifstream in("/home/baek/git/Ku_ik/resources/dynamic_vehicle_waypoint.txt");
+    // std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_3_waypoint.txt");
 
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
@@ -227,10 +245,19 @@ void PointControl::next_point() {
         next_point_x = waypoint[0];
         next_point_y = waypoint[1];
 
+        // Avoid();
         count++;
     }
+    // ROS_INFO("purepursuit_waypoint_count %i", purepursuit_waypoint_count);
 
     purepursuit_waypoint_count++;
+    
+    // // waypoint_test
+    // if (purepursuit_waypoint_count == waypoint_vec.size()) {
+    //     purepursuit_waypoint_count = 0;
+    // }
+    // // waypoint_test
+    // Avoid();
 }
 
 void PointControl::next_speed() {
@@ -249,9 +276,56 @@ void PointControl::next_speed() {
     }
 
     velocity_container_count++;
+    if (velocity_container_count >= velocity_vec.size()) {
+        target_speed_ms = 0;  // not_waypoint_test
+        // velocity_container_count = 0;  // waypoint_test
+    }
 }
 
-void PointControl::pure_pursuit(){
+bool PointControl::DeliveryZone() {
+    bool delivery_zone = false;
+    double distance = DELIVERY_STOP_DISTANCE;
+    double a_x = A_ZONE_X;
+    double a_y = A_ZONE_Y;
+    double b_x = B_ZONE_X;
+    double b_y = B_ZONE_Y;
+    double c_x = C_ZONE_X;
+    double c_y = C_ZONE_Y;
+    double d_x = D_ZONE_X;
+    double d_y = D_ZONE_Y;
+    double x_a = ego_vehicle_x - a_x;
+    double y_a = ego_vehicle_y - a_y;
+    double x_b = ego_vehicle_x - b_x;
+    double y_b = ego_vehicle_y - b_y;
+    double x_c = ego_vehicle_x - c_x;
+    double y_c = ego_vehicle_y - c_y;
+    double x_d = ego_vehicle_x - d_x;
+    double y_d = ego_vehicle_y - d_y;
+    distance_a = sqrt(pow(x_a, 2) + pow(y_a, 2));
+    distance_b = sqrt(pow(x_b, 2) + pow(y_b, 2));
+    distance_c = sqrt(pow(x_c, 2) + pow(y_c, 2));
+    distance_d = sqrt(pow(x_d, 2) + pow(y_d, 2));
+    if (distance_a < distance || distance_b < distance || distance_c < distance || distance_d < distance) {
+        delivery_zone = true; 
+    }
+    else {
+        delivery_zone = false;
+        delivery_end = false;
+    }
+
+    return delivery_zone;
+}
+
+void PointControl::DeliveryStop() {
+    if (delivery_zone) {
+        target_speed_ms = 0.0;
+        if(current_speed < 0.1) {
+            delivery_time = true;
+        }
+    }
+}
+
+void PointControl::pure_pursuit() {
     waypoint_angle = - atan2( 2 * purepursuit_current_co_tf_y * wheelbase, pow(purepursuit_d, 2) ) * (2 / M_PI);  // steering: -1.0 ~ 1.0
     // waypoint_angle *= 1.221730351448059;                                                              // steering ratio
 
@@ -281,24 +355,29 @@ void PointControl::pure_pursuit(){
     }
 }
 
-void PointControl::purepursuit_next_point(){
+void PointControl::purepursuit_next_point() {
     wheelbase = 2.66503413435;     // wheelbase
     double velocity = current_speed * 3.6;
-    Ld = 0 + (0.25 * velocity);  // TODO:tunnings
+    if (avoid_state == 70) {
+        Ld = 0 + (0.25 * velocity);  // TODO:tunnings
+    }
     // Ld = 5.0;
     if (Ld <= 2.0) {
         Ld = 2.0;
     }
 
     while(1) {
+
+        // Avoid();
         std::pair<double, double> p = coordinate_tf(next_point_x, next_point_y);
         purepursuit_current_co_tf_x = p.first;
         purepursuit_current_co_tf_y = p.second;
         purepursuit_current_co_tf_x += 1.206373665536404;                                                 // from rear wheel
         purepursuit_d = sqrt( pow(purepursuit_current_co_tf_x, 2) + pow(purepursuit_current_co_tf_y, 2) );  // target distance from rear wheel
         if (purepursuit_d <= Ld) {
-            next_point();
             next_speed();
+            next_point();
+            Avoid();
         }
         else {
             break;
@@ -373,6 +452,12 @@ void PointControl::control() {
     move.manual_gear_shift = false;
     if (global_planning) {
         control_pub.publish(move);
+        if (delivery_zone && delivery_time) {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            delivery_time = false;
+            delivery_end = true;
+            next_speed();
+        }
     }
 }
 
@@ -406,6 +491,7 @@ void PointControl::calc_midpoint() {
     // ROS_INFO("mid_co_tf_x = %f", mid_co_tf_x);
     // ROS_INFO("mid_co_tf_y = %f", mid_co_tf_y);
 }
+
 void PointControl::purepursuit_point_marker() {
     purepursuit_point.header.frame_id = "map";
     purepursuit_point.header.stamp = ros::Time::now();
@@ -471,9 +557,9 @@ void PointControl::mid_point_marker() {
     point_pub.publish(line_mid_point);
 }
 
-void PointControl::state_Callback(const std_msgs::Int64::ConstPtr& state_msg) {
-    following_state = state_msg->data;
-}
+// void PointControl::state_Callback(const std_msgs::Int64::ConstPtr& state_msg) {
+//     following_state = state_msg->data;
+// }
 
 void PointControl::calc_sliding_window_near_point() {
     sliding_window_near_point_x = next_point_x;
@@ -627,10 +713,230 @@ std::vector<double> PointControl::reconstructionFilter(const std::vector<double>
     return result;
 }
 
+void PointControl::ObjectDetection() {
+    std::string object_type = fusion_msg.Class;
+    double object_distance = fusion_msg.distance;
+    if (object_type == "pedesatrian") {
+        pedestrian_distance = object_distance;
+        PedestrianStop();
+    }
+    else if(object_type == "vehicle") {
+        dynamic_vehicle_distance = object_distance;
+        DynamicVehicleVelocity();
+    }
+}
+
+void PointControl::PedestrianStop() {
+    if(pedestrian_distance <= 7) {
+        accelerator = 0.0;
+        stop = 1.0;
+    }
+}
+
+void PointControl::DynamicVehicleVelocity() {
+    // if(0< dynamic_vehicle_distance && dynamic_vehicle_distance < 20) {
+    //     accelerator = 0.0;
+    //     if(dynamic_vehicle_distance < 10) {
+    //         stop = 0.5;
+    //     }
+    //     else if(dynamic_vehicle_distance < 5) {
+    //         stop = 1.0;
+    //     }
+    //     else {
+    //         stop = 0.0;
+    //         next_speed();
+    //     }
+    // }
+    // else if(dynamic_vehicle_distance > 20) {
+    //     accelerator += 0.1;
+    // }
+    // else{
+    //     next_speed();
+    // }
+    double speed = dynamic_vehicle_distance * FCA_DISTANCE;
+    if (speed > MAX_SPEED_KPH) {
+        speed = MAX_SPEED_KPH;
+    }
+    target_speed_ms = speed / 3.6;
+}
+
+void PointControl::Dot(double result[3][1], double A[3][3], double B[3][1]) {
+    // int rows_A = A.size();
+    // int cols_A = A[0].size();
+    // int rows_B = B.size();
+    // int cols_B = B[0].size();
+
+    for (int i = 0; i < 3; ++i) {
+        result[i][0] = 0; // 결과 행렬의 각 요소 초기화
+        for (int k = 0; k < 3; ++k) {
+            result[i][0] += A[i][k] * B[k][0]; // 행렬 곱셈 수행
+        }
+    }
+}
+
+void PointControl::LatticePlanning() {
+    double global_ref_start_point_x = waypoint_vec[purepursuit_waypoint_count][0];
+    double global_ref_start_point_y = waypoint_vec[purepursuit_waypoint_count][1];
+    std::vector<double> global_ref_start_point;
+    global_ref_start_point.push_back(global_ref_start_point_x);
+    global_ref_start_point.push_back(global_ref_start_point_y);
+
+    double global_ref_start_next_point_x = waypoint_vec[purepursuit_waypoint_count+1][0];
+    double global_ref_start_next_point_y = waypoint_vec[purepursuit_waypoint_count+1][1];
+    std::vector<double> global_ref_start_next_point;
+    global_ref_start_next_point.push_back(global_ref_start_next_point_x);
+    global_ref_start_next_point.push_back(global_ref_start_next_point_y);
+
+    double global_ref_end_point_x = waypoint_vec[purepursuit_waypoint_count+(2 * Ld)][0];
+    double global_ref_end_point_y = waypoint_vec[purepursuit_waypoint_count+(2 * Ld)][1];
+    std::vector<double> global_ref_end_point;
+    global_ref_end_point.push_back(global_ref_end_point_x);
+    global_ref_end_point.push_back(global_ref_end_point_y);
+
+    double theta = atan2(global_ref_start_next_point[1] - global_ref_start_point[1], global_ref_start_next_point[0] - global_ref_start_point[0]);
+    double translation[] = {global_ref_start_point[0], global_ref_start_point[1]};
+    double trans_matrix[3][3] = {{cos(theta), -sin(theta), translation[0]},{sin(theta), cos(theta), translation[1]},{0, 0, 1}};
+    double det_trans_matrix[3][3] = {{trans_matrix[0][0], trans_matrix[1][0], -(trans_matrix[0][0] * translation[0] + trans_matrix[1][0] * translation[1])},
+                               {trans_matrix[0][1], trans_matrix[1][1], -(trans_matrix[0][1] * translation[0] + trans_matrix[1][1] * translation[1])},
+                               {0, 0, 1}};
+
+    double world_end_point[3][1] = {{global_ref_end_point[0]}, {global_ref_end_point[1]}, {1}};
+    double local_end_point[3][1];
+    Dot(local_end_point, det_trans_matrix, world_end_point);
+    // ROS_INFO("local_end_point = %f", local_end_point[0][0]);
+
+    double world_ego_vehicle_position[3][1] = {{ego_vehicle_x}, {ego_vehicle_y}, {1}};
+    double local_ego_vehicle_position[3][1];
+    Dot(local_ego_vehicle_position, det_trans_matrix, world_ego_vehicle_position);
+
+    std::vector<double> lane_off_set;
+    lane_off_set.insert(lane_off_set.end(), {-5, -4, -3.75, -2, 2, 3.75, 4, 5});  // TODO: tunning
+    std::vector<std::vector<double>> local_lattice_points;
+    for (int i = 0; i > lane_off_set.size(); i++) {
+        std::vector<double> vector;
+        vector.insert(vector.end(), {local_end_point[0][0], local_end_point[1][0] + lane_off_set[i], 1});
+        local_lattice_points.push_back(vector);
+    }
+
+    for(int i = 0; local_lattice_points.size(); i++) {
+        nav_msgs::Path lattice_path;
+        lattice_path.header.frame_id = "map";
+        std::vector<double> x;
+        std::vector<double> y;
+        double x_interval = 0.5;
+        double xf = local_lattice_points[i][0];
+        double ps = local_ego_vehicle_position[1][0];
+        double pf = local_lattice_points[i][1];
+        double x_num = xf / x_interval;
+
+        for (int j = 0; j > int(x_num); j++){
+            x.push_back(j*x_interval);
+        }
+
+        Eigen::VectorXf a(4);
+        a(0) = ps;
+        a(1) = 0;
+        a(2) = 3.0 * (pf - ps) / (xf * xf);
+        a(3) = -2.0 * (pf - ps) / (xf * xf * xf);
+
+        for (int j = 0; j > x.size(); j++){
+            double k = x[j];
+            double result = a(3) * k * k * k + a(2) * k * k + a(1) * k + a(0);
+            y.push_back(result);
+        }
+
+        for (int j = 0; j > y.size(); j++){
+            // Eigen::MatrixXf local_result(3,1);
+            // local_result = {{x[j]}, {y[j]}, {1}};
+            double local_result[3][1] = {{x[j]}, {y[j]}, {1}};
+            double global_result[3][1];
+            Dot(global_result, trans_matrix, local_result);
+            geometry_msgs::PoseStamped read_pose;
+            read_pose.pose.position.x = global_result[0][0];
+            read_pose.pose.position.y = global_result[1][0];
+            read_pose.pose.position.z = 0;
+            read_pose.pose.orientation.x = 0;
+            read_pose.pose.orientation.y = 0;
+            read_pose.pose.orientation.z = 0;
+            read_pose.pose.orientation.w = 1;
+            lattice_path.poses.push_back(read_pose);
+        }
+        out_path.push_back(lattice_path);
+    }
+}
+
+void PointControl::LatticeIndex() {
+    nav_msgs::Path lattice_path;
+    lattice_path = out_path[0];
+    lattice_pub.publish(lattice_path);
+}
+
+void PointControl::AvoidStateCallback(const std_msgs::Int64::ConstPtr& avoid_state_msg) {
+    avoid_state = avoid_state_msg->data;
+}
+
+void PointControl::Avoid(){
+    bool pose;
+    if (init_position_x == -138.765396118) {
+        pose = true;
+    }
+    else if (init_position_x == 188.886138916) {
+        pose = false;
+    }
+
+    if (avoid_state == 71) {
+        target_speed_ms = 10 / 3.6;
+        Ld = 10.0;
+    }
+    else if (avoid_state == 72) {
+        target_speed_ms = 10 / 3.6;
+        // next_point();
+        if (pose) {
+            next_point_y += 3.5;
+        }
+        else {
+            next_point_y -= 3.5;
+        } 
+        // next_point_y -= 3.5;
+        Ld = 10.0;
+    }
+    else if (avoid_state == 73) {
+        // next_speed();
+        // next_point();
+        if (pose) {
+            next_point_y += 3.5;
+        }
+        else {
+            next_point_y -= 3.5;
+        } 
+        // next_point_y -= 3.5;
+        Ld = 10.0;
+    }
+    else if (avoid_state == 74 || avoid_state == 75) {
+        // next_point();
+        target_speed_ms = 10 / 3.6;
+        Ld = 10.0;
+    }
+    else {
+        // next_point();
+        // next_speed();
+    }
+}
+
 void PointControl::Print() {
     ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
+    ROS_INFO("follow_point = %f, %f", purepursuit_current_co_tf_x, purepursuit_current_co_tf_y);
     double target_speed_kph = target_speed_ms * 3.6;
     ROS_INFO("target_speed_kph = %f", target_speed_kph);
+    ROS_INFO("Ld = %f", Ld);
+    // ROS_INFO("distance_a = %f", distance_a);
+    // ROS_INFO("distance_b = %f", distance_b);
+    // ROS_INFO("distance_c = %f", distance_c);
+    // ROS_INFO("distance_d = %f", distance_d);
+    // ROS_INFO("delivery_end = %i", delivery_end);
+    // ROS_INFO("delivery_zone = %i", delivery_zone);
+    // ROS_INFO("delivery_time = %i", delivery_time);
+    ROS_INFO("========================================");
 }
 
 void PointControl::publish() {
@@ -638,6 +944,7 @@ void PointControl::publish() {
     mid_point_marker();
     purepursuit_point_marker();
     calc_sliding_window_error();
+    // LatticeIndex();
 }
 
 void PointControl::Run() {
@@ -645,9 +952,16 @@ void PointControl::Run() {
         ReadCenterLine();  // not_waypoint_test
     }
     if (global_planning) {
-        // pure_pursuit();
-
         purepursuit_next_point();
+        delivery_zone = DeliveryZone();
+        if (!delivery_end) {
+            DeliveryStop();
+        }
+        if (obeject_detection) {
+            ObjectDetection();
+        }
+        // LatticePlanning();
+        // Avoid();
         publish();
     }
     Print();

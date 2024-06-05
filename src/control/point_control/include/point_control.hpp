@@ -4,6 +4,7 @@
 #include <carla_msgs/CarlaEgoVehicleControl.h>
 #include <carla_msgs/CarlaEgoVehicleStatus.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <std_msgs/Float32.h>
 #include <iostream>
 #include <fstream>
@@ -17,8 +18,12 @@
 #include <std_msgs/Int64.h>
 #include <WGS84toCartesian.hpp>
 #include <armadillo>
+#include <chrono>
+#include <thread>
+#include <detection_msgs/SensorFusion.h>
+#include <eigen3/Eigen/Dense>
 
-#define SPEED_KPH  30
+#define SPEED_KPH  20
 #define sliding_window_dis 5.0
 #define init_position_x -138.765396118  // not_waypoint_test
 #define init_position_y 186.384170532  // not_waypoint_test
@@ -26,15 +31,28 @@
 // #define init_position_y -91.5933456421  // not_waypoint_test
 // #define init_position_x -54.9099540710449  // waypoint_test
 // #define init_position_y 77.2210540771484  // waypoint_test
+// #define init_position_x -184.5  // waypoint_test
+// #define init_position_y 63.0  // waypoint_test
 
 #define LOCAL_X                 0
 #define LOCAL_Y                 1
 #define IDX_DIFF                20
 #define MAX_LATERAL_ACCEL_MS2   1.5  // 3.5
-#define MAX_SPEED_KPH           40
-#define START_END_SPEED_KPH     30
+#define MAX_SPEED_KPH           20
+#define START_END_SPEED_KPH     10
 #define WINDOW_SIZE             10
 #define THRESHOLD_SIZE          1
+#define FCA_DISTANCE            1.5
+
+#define DELIVERY_STOP_DISTANCE  5.0
+#define A_ZONE_X                37.1479187012   // -77.0
+#define A_ZONE_Y                35.9507026672   // 186.4
+#define B_ZONE_X                -133.051208496  // -10.0
+#define B_ZONE_Y                -47.4016838074  // 186.4
+#define C_ZONE_X                -90.6944885254
+#define C_ZONE_Y                -96.712928772
+#define D_ZONE_X                87.8212203979
+#define D_ZONE_Y                -86.132522583
 
 class PointControl {
   private:
@@ -92,9 +110,26 @@ class PointControl {
     int velocity_container_count = 0;
     double stop = 0.0;
     double start_end_speed_ms = 0.0;
+    bool delivery_zone = false;
+    bool delivery_time = false;
+    bool delivery_end = false;
+    double distance_a, distance_b, distance_c, distance_d;
+
+    ros::Subscriber object_sub;
+    detection_msgs::SensorFusion fusion_msg;
+    bool obeject_detection = false;
+    double pedestrian_distance = 100;
+    double dynamic_vehicle_distance = 100;
+    double prev_dynamic_vehicle_distance;
+
+    ros::Publisher lattice_pub;
+    std::vector<nav_msgs::Path> out_path;
+    ros::Subscriber sub_avoid_state;
+    int avoid_state = 70;
 
   public:
     PointControl();
+    void ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg);
     void OsmCallback(const geometry_msgs::PoseArray::ConstPtr& center_line_msg);
     void ReadCenterLine();
     std::vector<double> WGS84toCartesian(double input_lat, double input_long);  // (latitude, longitude) to (x, y)
@@ -107,6 +142,8 @@ class PointControl {
     std::pair<double, double> coordinate_tf(double input_x, double input_y);    // transform coordinate from vehicle
     void next_point();
     void next_speed();
+    bool DeliveryZone();
+    void DeliveryStop();
     void pure_pursuit();
     void purepursuit_next_point();
     void speed_Callback(const std_msgs::Float32::ConstPtr& speed_msg);  //현재 속도
@@ -125,6 +162,16 @@ class PointControl {
     void SetVelocityProfile(std::vector<std::vector<double>>& container);
     std::vector<double> MovingAveFilter(const std::vector<double>& data);
     std::vector<double> reconstructionFilter(const std::vector<double>& data);
+    
+    void ObjectDetection();
+    void PedestrianStop();
+    void DynamicVehicleVelocity();
+
+    void Dot(double result[3][1], double A[3][3], double B[3][1]);
+    void LatticePlanning();
+    void LatticeIndex();
+    void AvoidStateCallback(const std_msgs::Int64::ConstPtr& avoid_state_msg);
+    void Avoid();
 
     void Print();
     void publish();

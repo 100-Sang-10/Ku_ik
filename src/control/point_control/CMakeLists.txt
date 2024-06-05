@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   visualization_msgs
+  detection_msgs
 )
 
 find_package(Armadillo REQUIRED)
@@ -128,6 +129,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${ARMADILLO_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
 )
 
 add_executable(point_control src/point_control.cpp)

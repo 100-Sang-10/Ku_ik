@@ -22,7 +22,7 @@
 #define MOVING_RIGHT_LANE     75
 
 
-#define LANE_CHANGE_RIGHT_OFFSET    -2.8
+#define LANE_CHANGE_RIGHT_OFFSET    2.5
 #define LANE_CHANGE_LEFT_OFFSET     2.8
 #define LANE_ERROR_DISTANCE_MAX     18
 #define LANE_ERROR_DISTANCE_MIN     10
@@ -59,6 +59,7 @@ class SetStateAndPub{
 
         double distance_with_front_obstacle = 9999.;
         double distance_with_right_obstacle = 9999.;
+        
 
         string vehicle_class;
         
@@ -68,6 +69,7 @@ class SetStateAndPub{
         bool vehicle_in_left;
         bool vehicle_in_right;
         bool fast_vehicle_in_right;
+        bool avoid_trigger;
 
     public:
         SetStateAndPub(){
@@ -86,6 +88,7 @@ class SetStateAndPub{
             vehicle_in_left = false;
             vehicle_in_right = true;
             lane_change = false;
+            avoid_trigger = false;
         };
         ~SetStateAndPub(){};
 
@@ -114,32 +117,30 @@ void SetStateAndPub::FObstaclePosCallback(const detection_msgs::SensorFusion::Co
 
 void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg){
     pcl::fromROSMsg(*pos_msg, right_obstacle);
+    double prev_distance_with_right_obs = 9999.;
     for(int index = 0 ; index < right_obstacle.size() ; index++){
+        if(right_obstacle[index].y < 0){
 
-        if(!right_obstacle.empty()){
-            if(right_obstacle[index].y < -1.3){
+            double temp_distance_w_right_obstacle = sqrt(pow(right_obstacle[index].x, 2)
+                                            + pow(right_obstacle[index].y, 2));
+            right_obstacle_x = right_obstacle[index].x;
+            right_obstacle_y = right_obstacle[index].y;
+            right_obstacle_z = right_obstacle[index].z;
 
-                distance_with_right_obstacle = sqrt(pow(right_obstacle[index].x, 2)
-                                                + pow(right_obstacle[index].y, 2));
-                right_obstacle_x = right_obstacle[index].x;
-                right_obstacle_y = right_obstacle[index].y;
-                right_obstacle_z = right_obstacle[index].z;
-                
-                if(distance_with_right_obstacle > 10.0){
-                    vehicle_in_right = false;
-                }
-                else{
-                    vehicle_in_right = true;
-                }
-            }
-            else{
-                vehicle_in_right = false;
+            if(prev_distance_with_right_obs > temp_distance_w_right_obstacle){
+                prev_distance_with_right_obs = temp_distance_w_right_obstacle;
             }
         }
+    }
         // else{
         //     vehicle_in_right = false;
         // }
-
+    distance_with_right_obstacle = prev_distance_with_right_obs;
+    if(prev_distance_with_right_obs > 8.0){
+        vehicle_in_right = false;
+    }
+    else{   
+        vehicle_in_right = true;
     }
                    
 
@@ -156,7 +157,7 @@ void SetStateAndPub::GNSSCallback(const nav_msgs::Odometry::ConstPtr& odom_msg){
         prev_vehicle_odom = ego_vehicle_odom;
     }
     if(state_name == "MOVING_LEFT_LANE"){
-        lane_change_thre_l = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
+        lane_change_thre_l = abs(prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
         if(lane_change_thre_l > LANE_CHANGE_LEFT_OFFSET){
             lane_change = true;
         }
@@ -166,8 +167,8 @@ void SetStateAndPub::GNSSCallback(const nav_msgs::Odometry::ConstPtr& odom_msg){
         prev_vehicle_odom = ego_vehicle_odom;
     }
     if(state_name == "MOVING_RIGHT_LANE"){
-        lane_change_thre_r = (prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
-        if(lane_change_thre_r < LANE_CHANGE_RIGHT_OFFSET){
+        lane_change_thre_r = abs(prev_vehicle_odom.pose.pose.position.y - ego_vehicle_odom.pose.pose.position.y);
+        if(lane_change_thre_r > LANE_CHANGE_RIGHT_OFFSET){
             lane_change = true;
         }
     }
@@ -188,84 +189,96 @@ void SetStateAndPub::VehicleStatusCallback(const carla_msgs::CarlaEgoVehicleStat
 
 void SetStateAndPub::SetState() {
     
+    if(!avoid_trigger){
+        switch (state) {
+            case GLOBAL_PATH_FOLLOW : 
+                local_planning = false;
+                state_name = "GLOBAL_PATH_FOLLOW";
 
-    switch (state) {
-        case GLOBAL_PATH_FOLLOW : 
-            local_planning = false;
-            state_name = "GLOBAL_PATH_FOLLOW";
-
-            if (vehicle_class == "vehicle" && (distance_with_front_obstacle <= LANE_ERROR_DISTANCE_MAX && distance_with_front_obstacle >= LANE_ERROR_DISTANCE_MIN)){
-                state = WAIT_MOVING_LEFT;
-                temp_state = state;
-            }
-            break;
-    
-        case WAIT_MOVING_LEFT :
-            local_planning = true;
-            state_name = "WAIT_MOVING_LEFT";
-            
-            if ((vehicle_in_left == false) && (ego_vehicle_lane_now != 1)) {
-                state = MOVING_LEFT_LANE; 
-                temp_state = state;
-            }
-            break;
-
-
-        case MOVING_LEFT_LANE :
-            local_planning = true;
-            state_name = "MOVING_LEFT_LANE";
-            // if (lane_change == true) {
-            //     state = WAIT_OVERTAKE;
-            //     temp_state = state;
-            // }
-            if (vehicle_in_front == false && lane_change == true) {
-                state = OVERTAKE;
-                temp_state = state;
-                lane_change = false;
-                lane_change_thre_l = 0;
-            }
-            break;
-
-        case OVERTAKE :
-            local_planning = true;
-            state_name = "OVERTAKE";
-            if ((vehicle_in_right == false)) {
-                state = WAIT_MOVING_RIGHT;
-                temp_state = state; 
-            }
-            break;
-            
-          case WAIT_MOVING_RIGHT :
-            local_planning = true;
-            state_name = "WAIT_MOVING_RIGHT";
-            
-            if ((vehicle_in_right == false)) {
-                state = MOVING_RIGHT_LANE; 
-                temp_state = state;
-            }
-            break;
+                if (vehicle_class == "vehicle" && (distance_with_front_obstacle <= LANE_ERROR_DISTANCE_MAX && distance_with_front_obstacle >= LANE_ERROR_DISTANCE_MIN)){
+                    state = WAIT_MOVING_LEFT;
+                    temp_state = state;
+                }
+                break;
+        
+            case WAIT_MOVING_LEFT :
+                local_planning = true;
+                state_name = "WAIT_MOVING_LEFT";
+                
+                if ((vehicle_in_left == false) && (ego_vehicle_lane_now != 1)) {
+                    state = MOVING_LEFT_LANE; 
+                    temp_state = state;
+                }
+                break;
 
 
-
-        case MOVING_RIGHT_LANE :
-            local_planning = true;
-            state_name = "MOVING_RIGHT_LANE";
-            if (lane_change == true) {
-                    state = GLOBAL_PATH_FOLLOW;
+            case MOVING_LEFT_LANE :
+                local_planning = true;
+                state_name = "MOVING_LEFT_LANE";
+                // if (lane_change == true) {
+                //     state = WAIT_OVERTAKE;
+                //     temp_state = state;
+                // }
+                if (vehicle_in_front == false && lane_change == true) {
+                    state = OVERTAKE;
                     temp_state = state;
                     lane_change = false;
                     lane_change_thre_l = 0;
-            }
-            // else {
-            //     state = OVERTAKE;
-            //     temp_state = state;
-            // }
-            
-            break;
+                }
+                break;
+
+            case OVERTAKE :
+                local_planning = true;
+                state_name = "OVERTAKE";
+                if ((vehicle_in_right == false)) {
+                    state = WAIT_MOVING_RIGHT;
+                    temp_state = state; 
+                }
+                break;
+                
+            case WAIT_MOVING_RIGHT :
+                local_planning = true;
+                state_name = "WAIT_MOVING_RIGHT";
+                
+                if ((vehicle_in_right == false)) {
+                    state = MOVING_RIGHT_LANE; 
+                    temp_state = state;
+                }
+                break;
+
+
+
+            case MOVING_RIGHT_LANE :
+                local_planning = true;
+                state_name = "MOVING_RIGHT_LANE";
+                if (lane_change == true) {
+                        state = GLOBAL_PATH_FOLLOW;
+                        temp_state = state;
+                        lane_change = false;
+                        lane_change_thre_l = 0;
+                        avoid_trigger = true;
+                }
+                else if (vehicle_in_right == true){
+                    state = OVERTAKE;
+                    temp_state = state;
+                }
+                // else {
+                //     state = OVERTAKE;
+                //     temp_state = state;
+                // }
+                
+                break;
+        }
+    }
+    else{
+        state_name = "GLOBAL_PATH_FOLLOW";
+        state = GLOBAL_PATH_FOLLOW;
+        temp_state = state;
     }
     // }
     state_number.data = state;
     state_pub.publish(state_number);
+    
 
 }
 
@@ -293,9 +306,11 @@ void SetStateAndPub::Print(){
     cout << "Distance :" << distance_with_front_obstacle << endl;
     cout << "Distance with front Obstacle : " << distance_with_front_obstacle << "(m)" <<endl;
     cout << "---------------" << endl;
+    cout << "right_obstacle empty : " << right_obstacle.empty() << ", size : "<< right_obstacle.size() << endl;
     cout << "Right obstacle x : " << right_obstacle_x << endl;
     cout << "Right obstacle y : " << right_obstacle_y << endl;
     cout << "Distance with right Obstacle : " << distance_with_right_obstacle << "(m)" <<endl;
+    cout << "---------------" << endl;
     cout << "lane_change_l : " << lane_change_thre_l  << endl;
     cout << "lane_change_r : " << lane_change_thre_r  << endl;
                 

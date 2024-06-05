@@ -114,8 +114,8 @@ std::vector<double> DynamicVehicleControl2::WGS84toCartesian(double input_lat, d
 
 void DynamicVehicleControl2::waypoint() {
     // std::ifstream in("../Ku_ik/resources/dynamic_vehicle_2_waypoint.txt");
-    std::ifstream in("../Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_2_waypoint.txt");
-
+    std::ifstream in("/home/kichang/Ku_ik/src/control/dynamic_vehicle_control/resources/dynamic_vehicle_2_waypoint.txt");
+    
     if (!in.is_open()) {
         ROS_ERROR("waypoint file not found!");
     }

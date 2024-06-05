@@ -292,7 +292,7 @@ void GlobalPlanning::GetLanelet(Dst& to_address){
       to_address.lanelet = map->laneletLayer.get(649);  //A
       break;
     case B :
-      to_address.lanelet = map->laneletLayer.get(21496); //B
+      to_address.lanelet = map->laneletLayer.get(179); //B
       break;
     case C :
       to_address.lanelet = map->laneletLayer.get(299);  //C //C' = 5797

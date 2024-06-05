@@ -23,12 +23,12 @@
 #include <detection_msgs/SensorFusion.h>
 #include <eigen3/Eigen/Dense>
 
-#define SPEED_KPH  30
+#define SPEED_KPH  20
 #define sliding_window_dis 5.0
-// #define init_position_x -138.765396118  // not_waypoint_test
-// #define init_position_y 186.384170532  // not_waypoint_test
-#define init_position_x 188.886138916  // not_waypoint_test
-#define init_position_y -91.5933456421  // not_waypoint_test
+#define init_position_x -138.765396118  // not_waypoint_test
+#define init_position_y 186.384170532  // not_waypoint_test
+// #define init_position_x 188.886138916  // not_waypoint_test
+// #define init_position_y -91.5933456421  // not_waypoint_test
 // #define init_position_x -54.9099540710449  // waypoint_test
 // #define init_position_y 77.2210540771484  // waypoint_test
 // #define init_position_x -184.5  // waypoint_test
@@ -38,8 +38,8 @@
 #define LOCAL_Y                 1
 #define IDX_DIFF                20
 #define MAX_LATERAL_ACCEL_MS2   1.5  // 3.5
-#define MAX_SPEED_KPH           30
-#define START_END_SPEED_KPH     20
+#define MAX_SPEED_KPH           20
+#define START_END_SPEED_KPH     10
 #define WINDOW_SIZE             10
 #define THRESHOLD_SIZE          1
 #define FCA_DISTANCE            1.5

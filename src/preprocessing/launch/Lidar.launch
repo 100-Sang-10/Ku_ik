@@ -1,7 +1,11 @@
 <launch>
 
-    <node pkg="preprocessing" type="preprocessing" name="preprocessing"  output="screen">
+    <node pkg="preprocessing" type="preprocessing" name="preprocessing"  >
+  </node>
+    <node pkg="preprocessing" type="right_preprocess" name="right_preprocess"  output="screen">
+  </node>
+    <node pkg="preprocessing" type="projection" name="projection" >
   </node>
 
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find preprocessing)/config/lidar.rviz" />
+  <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find preprocessing)/config/lidar.rviz" /> -->
 </launch>

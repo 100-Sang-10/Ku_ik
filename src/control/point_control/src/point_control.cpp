@@ -245,6 +245,7 @@ void PointControl::next_point() {
         next_point_x = waypoint[0];
         next_point_y = waypoint[1];
 
+        // Avoid();
         count++;
     }
     // ROS_INFO("purepursuit_waypoint_count %i", purepursuit_waypoint_count);
@@ -256,6 +257,7 @@ void PointControl::next_point() {
     //     purepursuit_waypoint_count = 0;
     // }
     // // waypoint_test
+    // Avoid();
 }
 
 void PointControl::next_speed() {
@@ -356,21 +358,26 @@ void PointControl::pure_pursuit() {
 void PointControl::purepursuit_next_point() {
     wheelbase = 2.66503413435;     // wheelbase
     double velocity = current_speed * 3.6;
-    Ld = 0 + (0.25 * velocity);  // TODO:tunnings
+    if (avoid_state == 70) {
+        Ld = 0 + (0.25 * velocity);  // TODO:tunnings
+    }
     // Ld = 5.0;
     if (Ld <= 2.0) {
         Ld = 2.0;
     }
 
     while(1) {
+
+        // Avoid();
         std::pair<double, double> p = coordinate_tf(next_point_x, next_point_y);
         purepursuit_current_co_tf_x = p.first;
         purepursuit_current_co_tf_y = p.second;
         purepursuit_current_co_tf_x += 1.206373665536404;                                                 // from rear wheel
         purepursuit_d = sqrt( pow(purepursuit_current_co_tf_x, 2) + pow(purepursuit_current_co_tf_y, 2) );  // target distance from rear wheel
         if (purepursuit_d <= Ld) {
-            next_point();
             next_speed();
+            next_point();
+            Avoid();
         }
         else {
             break;
@@ -869,22 +876,50 @@ void PointControl::AvoidStateCallback(const std_msgs::Int64::ConstPtr& avoid_sta
 }
 
 void PointControl::Avoid(){
+    bool pose;
+    if (init_position_x == -138.765396118) {
+        pose = true;
+    }
+    else if (init_position_x == 188.886138916) {
+        pose = false;
+    }
+
     if (avoid_state == 71) {
         target_speed_ms = 10 / 3.6;
+        Ld = 10.0;
     }
     else if (avoid_state == 72) {
         target_speed_ms = 10 / 3.6;
-        purepursuit_current_co_tf_y += 3.8;
+        // next_point();
+        if (pose) {
+            next_point_y += 3.5;
+        }
+        else {
+            next_point_y -= 3.5;
+        } 
+        // next_point_y -= 3.5;
+        Ld = 10.0;
     }
     else if (avoid_state == 73) {
-        next_speed();
-        purepursuit_current_co_tf_y += 3.8;
+        // next_speed();
+        // next_point();
+        if (pose) {
+            next_point_y += 3.5;
+        }
+        else {
+            next_point_y -= 3.5;
+        } 
+        // next_point_y -= 3.5;
+        Ld = 10.0;
     }
     else if (avoid_state == 74 || avoid_state == 75) {
+        // next_point();
         target_speed_ms = 10 / 3.6;
+        Ld = 10.0;
     }
     else {
-        next_speed();
+        // next_point();
+        // next_speed();
     }
 }
 
@@ -893,6 +928,7 @@ void PointControl::Print() {
     ROS_INFO("follow_point = %f, %f", purepursuit_current_co_tf_x, purepursuit_current_co_tf_y);
     double target_speed_kph = target_speed_ms * 3.6;
     ROS_INFO("target_speed_kph = %f", target_speed_kph);
+    ROS_INFO("Ld = %f", Ld);
     // ROS_INFO("distance_a = %f", distance_a);
     // ROS_INFO("distance_b = %f", distance_b);
     // ROS_INFO("distance_c = %f", distance_c);
@@ -925,7 +961,7 @@ void PointControl::Run() {
             ObjectDetection();
         }
         // LatticePlanning();
-        Avoid();
+        // Avoid();
         publish();
     }
     Print();

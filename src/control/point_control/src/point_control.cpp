@@ -9,13 +9,14 @@ PointControl::PointControl() {
     sub_midpoint = nh.subscribe("/mid_point", 100, &PointControl::point_Callback, this);
     point_pub = nh.advertise<visualization_msgs::Marker>("/point_marker", 100);
     purepursuit_point_pub = nh.advertise<visualization_msgs::Marker>("/purepursuit_point_marker", 100);
-    sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
+    // sub_state = nh.subscribe("/state", 100, &PointControl::state_Callback, this);
     sliding_window_error_pub = nh.advertise<std_msgs::Float32>("/sliding_window_error",100);
 
     center_marker_sub = nh.subscribe("/center_line_point", 100, &PointControl::OsmCallback, this);
 
     object_sub = nh.subscribe("/fusion_info", 100, &PointControl::ObjectCallback, this);
     lattice_pub = nh.advertise<nav_msgs::Path>("/lattice_path",100);
+    sub_avoid_state = nh.subscribe("/state", 100, &PointControl::AvoidStateCallback, this);
 }
 
 void PointControl::ObjectCallback(const detection_msgs::SensorFusion::ConstPtr& obj_msg) {
@@ -549,9 +550,9 @@ void PointControl::mid_point_marker() {
     point_pub.publish(line_mid_point);
 }
 
-void PointControl::state_Callback(const std_msgs::Int64::ConstPtr& state_msg) {
-    following_state = state_msg->data;
-}
+// void PointControl::state_Callback(const std_msgs::Int64::ConstPtr& state_msg) {
+//     following_state = state_msg->data;
+// }
 
 void PointControl::calc_sliding_window_near_point() {
     sliding_window_near_point_x = next_point_x;

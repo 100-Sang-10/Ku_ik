@@ -7,6 +7,7 @@
 #include "geometry_msgs/Point.h"
 #include "nav_msgs/Odometry.h"
 #include "detection_msgs/SensorFusion.h"
+#include "std_msgs/Int64.h"
 
 #include "pcl/point_cloud.h"
 #include <pcl_conversions/pcl_conversions.h>
@@ -36,6 +37,7 @@ class SetStateAndPub{
         ros::Subscriber vehicle_odom_sub;
         ros::Subscriber front_obstacle_pos;
         ros::Subscriber right_obstacle_pos;
+        ros::Publisher state_pub;
 
         carla_msgs::CarlaEgoVehicleStatus ego_vehicle_status;
         nav_msgs::Odometry ego_vehicle_odom;
@@ -43,6 +45,7 @@ class SetStateAndPub{
         pcl::PointCloud<pcl::PointXYZ> right_obstacle;
         
         int state;
+        std_msgs::Int64 state_number;
         string state_name;
         int ego_vehicle_lane_before;
         int ego_vehicle_lane_now = 3;
@@ -72,6 +75,9 @@ class SetStateAndPub{
             vehicle_odom_sub = nh.subscribe("/carla/ego_vehicle/odometry", 100, &SetStateAndPub::GNSSCallback, this);
             front_obstacle_pos = nh.subscribe("/fusion_info", 100, &SetStateAndPub::FObstaclePosCallback, this);
             right_obstacle_pos = nh.subscribe("/right_output", 100, &SetStateAndPub::RObstaclePosCallback, this);
+
+            state_pub = nh.advertise<std_msgs::Int64>("/state", 1000);
+
             state = GLOBAL_PATH_FOLLOW;
             local_planning = false;
             vehicle_in_front = false;
@@ -108,7 +114,6 @@ void SetStateAndPub::FObstaclePosCallback(const detection_msgs::SensorFusion::Co
 
 void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstPtr& pos_msg){
     pcl::fromROSMsg(*pos_msg, right_obstacle);
-
     for(int index = 0 ; index < right_obstacle.size() ; index++){
 
         if(!right_obstacle.empty()){
@@ -259,6 +264,8 @@ void SetStateAndPub::SetState() {
             break;
     }
     // }
+    state_number.data = state;
+    state_pub.publish(state_number);
 
 }
 

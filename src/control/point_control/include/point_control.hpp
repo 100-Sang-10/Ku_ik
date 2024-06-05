@@ -4,6 +4,7 @@
 #include <carla_msgs/CarlaEgoVehicleControl.h>
 #include <carla_msgs/CarlaEgoVehicleStatus.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <std_msgs/Float32.h>
 #include <iostream>
 #include <fstream>
@@ -20,17 +21,18 @@
 #include <chrono>
 #include <thread>
 #include <detection_msgs/SensorFusion.h>
+#include <eigen3/Eigen/Dense>
 
 #define SPEED_KPH  30
 #define sliding_window_dis 5.0
-// #define init_position_x -138.765396118  // not_waypoint_test
-// #define init_position_y 186.384170532  // not_waypoint_test
+#define init_position_x -138.765396118  // not_waypoint_test
+#define init_position_y 186.384170532  // not_waypoint_test
 // #define init_position_x 188.886138916  // not_waypoint_test
 // #define init_position_y -91.5933456421  // not_waypoint_test
 // #define init_position_x -54.9099540710449  // waypoint_test
 // #define init_position_y 77.2210540771484  // waypoint_test
-#define init_position_x -184.5  // waypoint_test
-#define init_position_y 63.0  // waypoint_test
+// #define init_position_x -184.5  // waypoint_test
+// #define init_position_y 63.0  // waypoint_test
 
 #define LOCAL_X                 0
 #define LOCAL_Y                 1
@@ -45,10 +47,10 @@
 #define DELIVERY_STOP_DISTANCE  5.0
 #define A_ZONE_X                37.1479187012   // -77.0
 #define A_ZONE_Y                35.9507026672   // 186.4
-#define B_ZONE_X                -196.809158325  // -10.0
-#define B_ZONE_Y                -43.3376693726  // 186.4
-#define C_ZONE_X                -156.98789978
-#define C_ZONE_Y                -96.6370849609
+#define B_ZONE_X                -133.051208496  // -10.0
+#define B_ZONE_Y                -47.4016838074  // 186.4
+#define C_ZONE_X                -90.6944885254
+#define C_ZONE_Y                -96.712928772
 #define D_ZONE_X                87.8212203979
 #define D_ZONE_Y                -86.132522583
 
@@ -93,8 +95,8 @@ class PointControl {
 
     ros::Subscriber center_marker_sub;
     geometry_msgs::PoseArray center_points;
-    bool global_planning = true;  // waypoint_test
-    // bool global_planning = false;  // not_waypoint_test
+    // bool global_planning = true;  // waypoint_test
+    bool global_planning = false;  // not_waypoint_test
     bool waypoint_stop = false;
 
     double current_speed;                              // speedometer
@@ -119,6 +121,11 @@ class PointControl {
     double pedestrian_distance = 100;
     double dynamic_vehicle_distance = 100;
     double prev_dynamic_vehicle_distance;
+
+    ros::Publisher lattice_pub;
+    std::vector<nav_msgs::Path> out_path;
+    ros::Subscriber sub_avoid_state;
+    int avoid_state = 70;
 
   public:
     PointControl();
@@ -159,6 +166,12 @@ class PointControl {
     void ObjectDetection();
     void PedestrianStop();
     void DynamicVehicleVelocity();
+
+    void Dot(double result[3][1], double A[3][3], double B[3][1]);
+    void LatticePlanning();
+    void LatticeIndex();
+    void AvoidStateCallback(const std_msgs::Int64::ConstPtr& avoid_state_msg);
+    void Avoid();
 
     void Print();
     void publish();

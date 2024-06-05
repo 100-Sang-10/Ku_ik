@@ -863,6 +863,30 @@ void PointControl::LatticeIndex() {
     lattice_pub.publish(lattice_path);
 }
 
+void PointControl::AvoidStateCallback(const std_msgs::Int64::ConstPtr& avoid_state_msg) {
+    avoid_state = avoid_state_msg->data;
+}
+
+void PointControl::Avoid(){
+    if (avoid_state == 71) {
+        target_speed_ms = 10 / 3.6;
+    }
+    else if (avoid_state == 72) {
+        target_speed_ms = 10 / 3.6;
+        next_point_y += 3.8;
+    }
+    else if (avoid_state == 73) {
+        next_speed();
+        next_point_y += 3.8;
+    }
+    else if (avoid_state == 74 || avoid_state == 75) {
+        target_speed_ms = 10 / 3.6;
+    }
+    else {
+        next_speed();
+    }
+}
+
 void PointControl::Print() {
     // ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
     double target_speed_kph = target_speed_ms * 3.6;
@@ -899,6 +923,7 @@ void PointControl::Run() {
             ObjectDetection();
         }
         // LatticePlanning();
+        Avoid();
         publish();
     }
     Print();

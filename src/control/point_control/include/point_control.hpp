@@ -124,6 +124,8 @@ class PointControl {
 
     ros::Publisher lattice_pub;
     std::vector<nav_msgs::Path> out_path;
+    ros::Subscriber sub_avoid_state;
+    int avoid_state = 70;
 
   public:
     PointControl();
@@ -168,6 +170,8 @@ class PointControl {
     void Dot(double result[3][1], double A[3][3], double B[3][1]);
     void LatticePlanning();
     void LatticeIndex();
+    void AvoidStateCallback(const std_msgs::Int64::ConstPtr& avoid_state_msg);
+    void Avoid();
 
     void Print();
     void publish();

@@ -873,11 +873,11 @@ void PointControl::Avoid(){
     }
     else if (avoid_state == 72) {
         target_speed_ms = 10 / 3.6;
-        next_point_y += 3.8;
+        purepursuit_current_co_tf_y += 3.8;
     }
     else if (avoid_state == 73) {
         next_speed();
-        next_point_y += 3.8;
+        purepursuit_current_co_tf_y += 3.8;
     }
     else if (avoid_state == 74 || avoid_state == 75) {
         target_speed_ms = 10 / 3.6;
@@ -888,7 +888,8 @@ void PointControl::Avoid(){
 }
 
 void PointControl::Print() {
-    // ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
+    ROS_INFO("next_point = %f, %f", next_point_x, next_point_y);
+    ROS_INFO("follow_point = %f, %f", purepursuit_current_co_tf_x, purepursuit_current_co_tf_y);
     double target_speed_kph = target_speed_ms * 3.6;
     ROS_INFO("target_speed_kph = %f", target_speed_kph);
     // ROS_INFO("distance_a = %f", distance_a);

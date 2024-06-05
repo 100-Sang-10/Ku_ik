@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /Marker1
+        - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 627
   - Class: rviz/Selection
@@ -26,7 +27,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -89,8 +90,36 @@ Visualization Manager:
       Marker Topic: /purepursuit_point_marker
       Name: Marker
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 5
+      Size (m): 0.009999999776482582
+      Style: Points
+      Topic: /right_output
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
@@ -119,7 +148,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.009999575093388557
+      Angle: 0.035000450909137726
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -129,10 +158,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 1.7561314105987549
+      Scale: 4.499981880187988
       Target Frame: <Fixed Frame>
-      X: -36.79191970825195
-      Y: -4.084874629974365
+      X: 181.28709411621094
+      Y: -142.65333557128906
     Saved: ~
 Window Geometry:
   Displays:

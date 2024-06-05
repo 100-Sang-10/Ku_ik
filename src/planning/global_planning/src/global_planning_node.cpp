@@ -96,9 +96,9 @@ class GlobalPlanning{
       m_init_bool = false;
     
 
-      // map = load("../Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
+      map = load("/home/kichang/Ku_ik/src/planning/global_planning/map/Town05_Final.osm",  projection::UtmProjector(Origin({0, 0})));
       // map = load("/home/baek/git/Ku_ik/src/planning/global_planning/map/Town05_modify.osm",  projection::UtmProjector(Origin({0, 0})));
-      map = load("/home/baek/git/Ku_ik/src/planning/global_planning/map/Town05_Final.osm",  projection::UtmProjector(Origin({0, 0})));
+      // map = load("/home/baek/git/Ku_ik/src/planning/global_planning/map/Town05_Final.osm",  projection::UtmProjector(Origin({0, 0})));
       trafficRules = traffic_rules::TrafficRulesFactory::create(Locations::Germany, Participants::Vehicle);
       graph = routing::RoutingGraph::build(*map, *trafficRules);
     };

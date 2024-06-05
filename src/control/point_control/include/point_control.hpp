@@ -25,10 +25,10 @@
 
 #define SPEED_KPH  30
 #define sliding_window_dis 5.0
-#define init_position_x -138.765396118  // not_waypoint_test
-#define init_position_y 186.384170532  // not_waypoint_test
-// #define init_position_x 188.886138916  // not_waypoint_test
-// #define init_position_y -91.5933456421  // not_waypoint_test
+// #define init_position_x -138.765396118  // not_waypoint_test
+// #define init_position_y 186.384170532  // not_waypoint_test
+#define init_position_x 188.886138916  // not_waypoint_test
+#define init_position_y -91.5933456421  // not_waypoint_test
 // #define init_position_x -54.9099540710449  // waypoint_test
 // #define init_position_y 77.2210540771484  // waypoint_test
 // #define init_position_x -184.5  // waypoint_test

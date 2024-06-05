@@ -899,7 +899,7 @@ void PointControl::Print() {
     // ROS_INFO("delivery_end = %i", delivery_end);
     // ROS_INFO("delivery_zone = %i", delivery_zone);
     // ROS_INFO("delivery_time = %i", delivery_time);
-    // ROS_INFO("========================================");
+    ROS_INFO("========================================");
 }
 
 void PointControl::publish() {

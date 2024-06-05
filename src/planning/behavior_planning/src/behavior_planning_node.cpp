@@ -78,7 +78,7 @@ class SetStateAndPub{
             
             fast_vehicle_in_right = false;
             vehicle_in_left = false;
-            vehicle_in_right = false;
+            vehicle_in_right = true;
             lane_change = false;
         };
         ~SetStateAndPub(){};
@@ -131,9 +131,9 @@ void SetStateAndPub::RObstaclePosCallback(const sensor_msgs::PointCloud2::ConstP
                 vehicle_in_right = false;
             }
         }
-        else{
-            vehicle_in_right = false;
-        }
+        // else{
+        //     vehicle_in_right = false;
+        // }
 
     }
                    
